@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monopoly Gold Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        poppins: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        monopoly: {
+                            red: '#ED1B24',
+                            blue: '#0072BC',
+                            green: '#00A650',
+                            yellow: '#FFF200',
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+<body class="font-poppins bg-gradient-to-br from-monopoly-blue to-monopoly-green min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-5xl font-extrabold text-center mb-12 text-white drop-shadow-lg">Monopoly Gold Shop</h1>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="max-w-md mx-auto mb-8">
+            <div class="{% if category == 'success' %}bg-green-100 border-green-500 text-green-700{% elif category == 'danger' %}bg-red-100 border-red-500 text-red-700{% else %}bg-gray-100 border-gray-500 text-gray-700{% endif %} border-l-4 p-4 rounded-lg">
+                {{ message }}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Buy Gold Card -->
+            <div class="bg-white p-8 rounded-xl shadow-2xl">
+                <h2 class="text-3xl font-bold mb-6 text-monopoly-yellow">Buy Gold</h2>
+                <p class="text-gray-600 mb-6">Current Gold Rate: <span class="font-semibold">PKR {{ gold_buy_rate }}</span></p>
+                <form action="{{ url_for('gold_shop', user=current_user) }}" method="POST">
+                    <input type="hidden" name="current_user" value="{{ current_user }}">
+                    <div class="mb-6">
+                        <label for="buy_amount" class="block text-gray-700 font-semibold mb-2">Gold Quantity:</label>
+                        <input type="number" id="buy_amount" name="buy_amount" class="w-full px-4 py-2 rounded-lg bg-gray-100 border-transparent focus:border-monopoly-yellow focus:bg-white focus:ring-0" step="0.01" min="0" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="buy_bill" class="block text-gray-700 font-semibold mb-2">Total Bill:</label>
+                        <input type="text" id="buy_bill" class="w-full px-4 py-2 rounded-lg bg-gray-100 border-transparent focus:border-monopoly-yellow focus:bg-white focus:ring-0" value="0.00 PKR" readonly>
+                    </div>
+                    <input type="hidden" name="action" value="buy">
+                    <button type="submit" class="w-full px-6 py-3 bg-monopoly-yellow text-gray-800 font-bold rounded-lg shadow-md hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-colors duration-300">Buy Now</button>
+                </form>
+            </div>
+
+            <!-- Sell Gold Card -->
+            <div class="bg-white p-8 rounded-xl shadow-2xl">
+                <h2 class="text-3xl font-bold mb-6 text-monopoly-yellow">Sell Gold</h2>
+                <p class="text-gray-600 mb-6">Current Gold Rate: <span class="font-semibold">PKR {{ gold_sell_rate }}</span></p>
+                <form action="{{ url_for('gold_shop', user=current_user) }}" method="POST">
+                    <input type="hidden" name="current_user" value="{{ current_user }}">
+                    <div class="mb-6">
+                        <label for="sell_amount" class="block text-gray-700 font-semibold mb-2">Gold Quantity:</label>
+                        <input type="number" id="sell_amount" name="sell_amount" class="w-full px-4 py-2 rounded-lg bg-gray-100 border-transparent focus:border-monopoly-yellow focus:bg-white focus:ring-0" step="0.01" min="0" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="sell_money" class="block text-gray-700 font-semibold mb-2">Total Money:</label>
+                        <input type="text" id="sell_money" class="w-full px-4 py-2 rounded-lg bg-gray-100 border-transparent focus:border-monopoly-yellow focus:bg-white focus:ring-0" value="0.00 PKR" readonly>
+                    </div>
+                    <input type="hidden" name="action" value="sell">
+                    <button type="submit" class="w-full px-6 py-3 bg-monopoly-yellow text-gray-800 font-bold rounded-lg shadow-md hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-colors duration-300">Sell Now</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="mt-12 text-center">
+            <a href="{{ url_for('dashboard', user=current_user) }}" class="inline-block px-8 py-4 bg-white text-monopoly-blue font-bold rounded-full hover:bg-gray-100 transition-colors duration-300">Back to Dashboard</a>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var buyAmount = document.getElementById('buy_amount');
+            var buyBill = document.getElementById('buy_bill');
+            var sellAmount = document.getElementById('sell_amount');
+            var sellMoney = document.getElementById('sell_money');
+            var goldBuyRate = parseFloat('{{ gold_buy_rate|default(0) }}');  // Ensure gold_buy_rate is defined and converted to a number
+            var goldSellRate = parseFloat('{{ gold_sell_rate|default(0) }}');  // Ensure gold_sell_rate is defined and converted to a number
+    
+            if (buyAmount) {
+                buyAmount.addEventListener('input', function() {
+                    var quantity = parseFloat(buyAmount.value) || 0;
+                    buyBill.value = `${(goldBuyRate * quantity).toFixed(2)} PKR`;
+                });
+            }
+    
+            if (sellAmount) {
+                sellAmount.addEventListener('input', function() {
+                    var quantity = parseFloat(sellAmount.value) || 0;
+                    sellMoney.value = `${(goldSellRate * quantity).toFixed(2)} PKR`;
+                });
+            }
+        });
+    </script>
+    
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monopoly Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        poppins: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        monopoly: {
+                            red: '#ED1B24',
+                            blue: '#0072BC',
+                            green: '#00A650',
+                            yellow: '#FFF200',
+                        },
+                    },
+                },
+            },
+        }
+
+        function formatNumber(value) {
+            if (value >= 1e9) {
+                return (value / 1e9).toFixed(1) + 'B';
+            } else if (value >= 1e6) {
+                return (value / 1e6).toFixed(1) + 'M';
+            } else if (value >= 1e3) {
+                return (value / 1e3).toFixed(1) + 'k';
+            } else {
+                return value;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var balanceElement = document.getElementById('balance');
+            var balanceValue = parseFloat(balanceElement.dataset.balance);
+            balanceElement.textContent = formatNumber(balanceValue) + '';   //write pkr in '' if you want to show pkr with amount
+
+            var loanElement = document.getElementById('loan');
+            var loanValue = parseFloat(loanElement.dataset.loan);
+            loanElement.textContent = formatNumber(loanValue) + '';
+        });
+    </script>
+</head>
+<body class="font-poppins bg-gradient-to-br from-monopoly-blue to-monopoly-green min-h-screen flex flex-col">
+    <div class="container mx-auto my-10 px-4 flex-grow">
+        <h1 class="text-5xl font-extrabold text-center mb-12 text-white drop-shadow-lg">Monopoly Dashboard</h1>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="max-w-md mx-auto mb-6">
+            <div class="{% if category == 'success' %}bg-green-100 border-green-500 text-green-700{% elif category == 'danger' %}bg-red-100 border-red-500 text-red-700{% else %}bg-gray-100 border-gray-500 text-gray-700{% endif %} border-l-4 p-4 rounded-lg">
+                {{ message }}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <!-- User Info Card -->
+        <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-lg rounded-xl p-8 shadow-2xl mb-12 ">
+            <h2 class="text-3xl font-bold text-monopoly-blue mb-4">Welcome, {{ user['name'] }}!</h2>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <p class="text-lg font-semibold text-gray-600">Balance</p>
+                    <p id="balance" data-balance="{{ user['balance'] }}" class="text-2xl font-bold text-monopoly-green"></p>
+                </div>
+                <div>
+                    <p class="text-lg font-semibold text-gray-600">Gold</p>
+                    <p class="text-2xl font-bold text-yellow-500">{{ user['gold'] }} grams</p>
+                </div>
+                <div>
+                    <p class="text-lg font-semibold text-gray-600">Loan</p>
+                    <p id="loan" data-loan="{{ user['loan'] }}" class="text-2xl font-bold text-monopoly-red"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Gold Shop -->
+            <div class="bg-white rounded-xl p-6 shadow-xl transform hover:-translate-y-2 transition-all duration-300">
+                <h5 class="text-2xl font-bold text-monopoly-yellow mb-4">Gold Shop</h5>
+                <p class="text-gray-600 mb-6">Buy and sell gold.</p>
+                <a href="{{ url_for('gold_shop', user=user['name']) }}" class="block w-full py-3 px-4 bg-monopoly-yellow text-white text-center font-bold rounded-lg hover:bg-yellow-400 transition-colors duration-300">Go to Gold Shop</a>
+            </div>
+
+            <!-- Transfers -->
+            <div class="bg-white rounded-xl p-6 shadow-xl transform hover:-translate-y-2 transition-all duration-300">
+                <h5 class="text-2xl font-bold text-monopoly-blue mb-4">Transfers</h5>
+                <p class="text-gray-600 mb-6">Transfer funds between users.</p>
+                <a href="{{ url_for('transfers', user=user['name']) }}" class="block w-full py-3 px-4 bg-monopoly-blue text-white text-center font-bold rounded-lg hover:bg-blue-600 transition-colors duration-300">Go to Transfers</a>
+            </div>
+
+            <!-- Banking -->
+            <div class="bg-white rounded-xl p-6 shadow-xl transform hover:-translate-y-2 transition-all duration-300">
+                <h5 class="text-2xl font-bold text-monopoly-green mb-4">Banking</h5>
+                <p class="text-gray-600 mb-6">Deposit/Withdraw/Loans</p>
+                <a href="{{ url_for('banking', user=user['name']) }}" class="block w-full py-3 px-4 bg-monopoly-green text-white text-center font-bold rounded-lg hover:bg-green-600 transition-colors duration-300">Go to Banking</a>
+            </div>
+        </div>
+
+        <!-- Logout Button -->
+        <div class="mt-12 text-center">
+            <a href="/login" class="inline-block px-8 py-4 bg-monopoly-red text-white font-bold rounded-full hover:bg-red-600 transition-all duration-300 transform hover:scale-105">Logout</a>
+        </div>
+    </div>
+</body>
+</html>
