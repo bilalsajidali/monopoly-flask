@@ -46,6 +46,19 @@
             var loanValue = parseFloat(loanElement.dataset.loan);
             loanElement.textContent = formatNumber(loanValue) + '';
         });
+
+        window.onpageshow = function(event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        };
+         // Function to hide flash messages after 5 seconds (5000 milliseconds)
+         window.setTimeout(function() {
+            var flashMessages = document.getElementById('flash-messages');
+            if (flashMessages) {
+                flashMessages.style.display = 'none';
+            }
+        }, 3000);
     </script>
 </head>
 <body class="font-poppins bg-gradient-to-br from-monopoly-blue to-monopoly-green min-h-screen flex flex-col">
@@ -53,6 +66,7 @@
         <h1 class="text-5xl font-extrabold text-center mb-12 text-white drop-shadow-lg">Monopoly Dashboard</h1>
 
         <!-- Flash messages -->
+        <div id="flash-messages"> 
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         {% for category, message in messages %}
@@ -60,6 +74,7 @@
             <div class="{% if category == 'success' %}bg-green-100 border-green-500 text-green-700{% elif category == 'danger' %}bg-red-100 border-red-500 text-red-700{% else %}bg-gray-100 border-gray-500 text-gray-700{% endif %} border-l-4 p-4 rounded-lg">
                 {{ message }}
             </div>
+        </div>
         </div>
         {% endfor %}
         {% endif %}
@@ -108,9 +123,8 @@
             </div>
         </div>
 
-        <!-- Logout Button -->
         <div class="mt-12 text-center">
-            <a href="/login" class="inline-block px-8 py-4 bg-monopoly-red text-white font-bold rounded-full hover:bg-red-600 transition-all duration-300 transform hover:scale-105">Logout</a>
+            <a href="{{ url_for('logout') }}" class="inline-block px-8 py-4 bg-monopoly-red text-white font-bold rounded-full hover:bg-red-600 transition-all duration-300 transform hover:scale-105">Logout</a>
         </div>
     </div>
 </body>

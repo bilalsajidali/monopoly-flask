@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, flash , jsonify 
+from flask import Flask,session, render_template, request, redirect, url_for, flash , jsonify , make_response
 from bson import ObjectId
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from functools import wraps
 
 import os
 import datetime
@@ -21,6 +22,21 @@ if not mongo_uri:
 client = MongoClient(mongo_uri)
 db_name = 'monopoly'  # Replace with your desired database name
 db = client[db_name]
+
+@app.before_request
+def check_login():
+    if 'user' not in session and request.endpoint not in ['login', 'play_game', 'static', 'home' ,'add_user',"delete_all_users","set_gold_rate","delete_all_bank_requests"]:
+        return redirect(url_for('login'))
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            flash('Please log in to access this page.', 'danger')
+            return redirect(url_for('play_game'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 @app.route('/')
 def home():
@@ -58,6 +74,8 @@ def add_user():
 
 @app.route('/play_game')
 def play_game():
+    if 'user' in session:
+        return redirect(url_for('dashboard'))
     try:
         users = db.Users.find()
         return render_template('login.html', users=users)
@@ -65,48 +83,79 @@ def play_game():
         print("Error fetching users for login:", e)
         return "Failed to load users.", 500
 
-@app.route('/login', methods=['GET','POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'POST':
+        try:
+            name = request.form.get('name')
+            password = request.form.get('password')
+            
+            user = db.Users.find_one({'name': name, 'password': password})
+            if user:
+                session['user'] = name
+                session['role'] = user['role']
+                flash('Logged in successfully.', 'success')
+                if user['role'] == 'player':
+                    return redirect(url_for('dashboard'))
+                elif user['role'] == 'banker':
+                    return redirect(url_for('bank_approval'))
+            else:
+                flash('Invalid username or password', 'danger')
+                return redirect(url_for('login'))
+        except Exception as e:
+            print("Error during login:", e)
+            flash("An error occurred during login.", 'danger')
+            return redirect(url_for('login'))
+    
+    # For GET requests, just render the login template
     try:
-        name = request.form.get('name')
-        password = request.form.get('password')
-        
-        user = db.Users.find_one({'name': name, 'password': password})
-        if user:
-            user_role = user["role"]
-            if user_role == 'player':
-                return redirect(url_for('dashboard', user=name))
-            elif user_role == 'banker':
-                return redirect(url_for('bank_approval'))
-        else:
-            flash('Invalid username or password', 'danger')
-            return redirect(url_for('play_game'))
+        users = db.Users.find()
+        return render_template('login.html', users=users)
     except Exception as e:
         print("Error fetching users for login:", e)
         return "Failed to load users.", 500
 
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('You have been logged out.', 'success')
+    response = make_response(redirect(url_for('play_game')))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 
 @app.route('/dashboard')
+@login_required
 def dashboard():
-    user_name = request.args.get('user')
-    if not user_name:
-        return redirect(url_for('home'))
+    # user_name = request.args.get('user')
+    # if not user_name:
+    #     return redirect(url_for('home'))
     
     try:
-        user = db.Users.find_one({'name': user_name})
+        user = db.Users.find_one({'name': session['user']})
         if not user:
-            return "User not found.", 404
+            session.clear()
+            flash('User not found.','danger')
+            return redirect(url_for('login'))
 
-        return render_template('dashboard.html', user=user)
+        response = make_response(render_template('dashboard.html', user=user))
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except Exception as e:
         print("Error loading dashboard:", e)
-        return "Failed to load dashboard.", 500
+        flash('Failed to load dashboard.', 'danger')
+        return redirect(url_for('login'))
 
 
 @app.route('/gold_shop', methods=['GET', 'POST'])
+@login_required
 def gold_shop():
     try:
-        current_user = request.args.get('user')
+        current_user = session['user']
         if not current_user:
             flash('No current user found.', 'danger')
             return redirect(url_for('home'))
@@ -317,15 +366,16 @@ def gold_shop():
         return redirect(url_for('gold_shop', user=current_user))
 
 @app.route('/transfers', methods=['GET', 'POST'])
+@login_required
 def transfers():
     if request.method == 'POST':
-        current_user = request.form.get('sender_name')  # Use form data for current_user, assuming sender_name is the logged-in user
+        current_user = session['user']  # Use form data for current_user, assuming sender_name is the logged-in user
         if not current_user:
             flash('No current user found.', 'danger')
             return redirect(url_for('home'))
         
         try:
-            sender_name = request.form.get('sender_name')
+            sender_name = session['user']
             receiver_name = request.form.get('receiver_name')
             amount = float(request.form.get('amount'))
             
@@ -372,9 +422,10 @@ def transfers():
 
 
 @app.route('/banking', methods=['GET', 'POST'])
+@login_required
 def banking():
     try:
-        current_user = request.args.get('user')
+        current_user = session['user']
         if not current_user:
             flash('No current user found.', 'danger')
             return redirect(url_for('home'))

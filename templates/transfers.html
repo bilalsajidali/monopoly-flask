@@ -24,6 +24,13 @@
                 },
             },
         }
+         // Function to hide flash messages after 5 seconds (5000 milliseconds)
+         window.setTimeout(function() {
+            var flashMessages = document.getElementById('flash-messages');
+            if (flashMessages) {
+                flashMessages.style.display = 'none';
+            }
+        }, 3000);
     </script>
 </head>
 <body class="font-poppins bg-gradient-to-br from-monopoly-blue to-monopoly-green min-h-screen flex items-center justify-center p-4">
@@ -35,6 +42,7 @@
         
         <div class="p-8">
             <!-- Flash messages -->
+            <div id="flash-messages"> 
             {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
             {% for category, message in messages %}
@@ -46,6 +54,7 @@
             {% endfor %}
             {% endif %}
             {% endwith %}
+            </div>
 
             <form action="{{ url_for('transfers') }}" method="POST" class="space-y-6">
                 <div>

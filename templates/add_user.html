@@ -24,6 +24,14 @@
                 },
             },
         }
+
+         // Function to hide flash messages after 5 seconds (5000 milliseconds)
+         window.setTimeout(function() {
+            var flashMessages = document.getElementById('flash-messages');
+            if (flashMessages) {
+                flashMessages.style.display = 'none';
+            }
+        }, 3000);
     </script>
 </head>
 <body class="font-poppins bg-gradient-to-br from-monopoly-blue to-monopoly-green min-h-screen flex items-center justify-center">
@@ -32,16 +40,19 @@
         <h1 class="text-4xl font-extrabold text-center mb-8 text-gray-800">Add User</h1>
 
         <!-- Flash messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        {% for category, message in messages %}
-        <div
+        <div id="flash-messages"> 
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div
             class="max-w-md mx-auto {% if category == 'success' %}bg-green-400 text-white border-green-600{% elif category == 'danger' %}bg-red-500 text-white border-red-600{% else %}bg-gray-100 text-gray-800 border-gray-300{% endif %} p-4 rounded-lg mb-6 border shadow-md">
             {{ message }}
         </div>
         {% endfor %}
         {% endif %}
         {% endwith %}
+        </div>
 
         <form action="{{ url_for('add_user') }}" method="POST">
             <div class="mb-4">
