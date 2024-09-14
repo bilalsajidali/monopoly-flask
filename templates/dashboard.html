@@ -37,14 +37,45 @@
             }
         }
 
+        function formatGold(value) {
+            if (value >= 1e6) {
+                return (value / 1e6).toFixed(1) + ' ton'; // ton for tons
+            } else if (value >= 1e3) {
+                return (value / 1e3).toFixed(1) + ' kg'; // kg for kilograms
+            } else {
+                return value + ' g'; // For values less than 1000 grams
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             var balanceElement = document.getElementById('balance');
-            var balanceValue = parseFloat(balanceElement.dataset.balance);
-            balanceElement.textContent = formatNumber(balanceValue) + '';   //write pkr in '' if you want to show pkr with amount
+            if (balanceElement) {
+                var balanceValue = parseFloat(balanceElement.dataset.balance);
+                balanceElement.textContent = formatNumber(balanceValue) + ''; // write pkr in '' if you want to show pkr with amount
+            }
 
             var loanElement = document.getElementById('loan');
-            var loanValue = parseFloat(loanElement.dataset.loan);
-            loanElement.textContent = formatNumber(loanValue) + '';
+            if (loanElement) {
+                var loanValue = parseFloat(loanElement.dataset.loan);
+                loanElement.textContent = formatNumber(loanValue) + '';
+            }
+
+            var goldElement = document.getElementById('gold');
+            if (goldElement) {
+                var goldValue = parseFloat(goldElement.dataset.gold);
+                goldElement.textContent = formatGold(goldValue);
+            }
+
+            // Function to hide flash messages after 3 seconds (3000 milliseconds)
+            var flashMessages = document.getElementById('flash-messages');
+            if (flashMessages) {
+                window.setTimeout(function() {
+                    flashMessages.style.opacity = 0; // Use opacity transition to fade out
+                    window.setTimeout(function() {
+                        flashMessages.style.display = 'none'; // Hide element after fade out
+                    }, 1000); // 1000 milliseconds for fade out transition
+                }, 3000);
+            }
         });
 
         window.onpageshow = function(event) {
@@ -52,13 +83,6 @@
                 window.location.reload();
             }
         };
-         // Function to hide flash messages after 5 seconds (5000 milliseconds)
-         window.setTimeout(function() {
-            var flashMessages = document.getElementById('flash-messages');
-            if (flashMessages) {
-                flashMessages.style.display = 'none';
-            }
-        }, 3000);
     </script>
 </head>
 <body class="font-poppins bg-gradient-to-br from-monopoly-blue to-monopoly-green min-h-screen flex flex-col">
@@ -75,10 +99,10 @@
                 {{ message }}
             </div>
         </div>
-        </div>
         {% endfor %}
         {% endif %}
         {% endwith %}
+        </div>
 
         <!-- User Info Card -->
         <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-lg rounded-xl p-8 shadow-2xl mb-12 ">
@@ -90,7 +114,7 @@
                 </div>
                 <div>
                     <p class="text-lg font-semibold text-gray-600">Gold</p>
-                    <p class="text-2xl font-bold text-yellow-500">{{ user['gold'] }} grams</p>
+                    <p id="gold" data-gold="{{ user['gold'] }}" class="text-2xl font-bold text-yellow-500"></p>
                 </div>
                 <div>
                     <p class="text-lg font-semibold text-gray-600">Loan</p>

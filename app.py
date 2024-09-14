@@ -3,6 +3,8 @@ from bson import ObjectId
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from functools import wraps
+from apscheduler.schedulers.background import BackgroundScheduler
+import random
 
 import os
 import datetime
@@ -25,7 +27,7 @@ db = client[db_name]
 
 @app.before_request
 def check_login():
-    if 'user' not in session and request.endpoint not in ['login', 'play_game', 'static', 'home' ,'add_user',"delete_all_users","set_gold_rate","delete_all_bank_requests"]:
+    if 'user' not in session and request.endpoint not in ['login', 'play_game', 'static', 'home' ,'add_user',"delete_all_users","set_gold_rate","update_gold_rate","delete_all_bank_requests"]:
         return redirect(url_for('login'))
 
 def login_required(f):
@@ -556,7 +558,28 @@ def bank_approval():
 
 #pre-post game api's
 
-@app.route('/set_gold_rate', methods=['POST'])
+def update_gold_rate():
+    # Fetch the current gold rate from the database
+    user = db.Users.find_one({'name': 'bilal'})
+    if not user:
+        print("User not found")
+        return
+    
+    current_rate = user.get('goldrate')
+
+    # Weighted choice: 2/3 chance to increase, 1/3 chance to decrease
+    if random.choices(['increase', 'decrease'], weights=[2, 1])[0] == 'increase':
+        new_rate = current_rate + 500
+    else:
+        new_rate = max(0, current_rate - 500)  # Ensure the rate doesn't go below 0
+
+    # Use your existing set_gold_rate logic to update the gold rate for user 'Bilal'
+    request_data = {'rate': new_rate}
+    with app.test_request_context(json=request_data):  # Simulate a request context
+        response = set_gold_rate()
+
+# Existing function to manually set the gold rate
+@app.route('/set-gold-rate', methods=['POST'])
 def set_gold_rate():
     data = request.get_json()
     rate = data.get('rate')
@@ -572,7 +595,10 @@ def set_gold_rate():
 
     return jsonify({"message": "Gold rate updated successfully"}), 200
 
-
+# Scheduler to update the gold rate every 60 seconds
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=update_gold_rate, trigger="interval", seconds=300)
+scheduler.start()
 
 @app.route('/delete_all_users', methods=['DELETE'])
 def delete_all_users():
@@ -588,4 +614,7 @@ def delete_all_bank_requests():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000 , debug=True)
+    try:
+        app.run(host='0.0.0.0', port=5000 , debug=True)
+    except (KeyboardInterrupt, SystemExit):
+        scheduler.shutdown()
