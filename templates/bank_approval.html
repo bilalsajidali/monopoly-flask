@@ -6,6 +6,7 @@
     <title>Monopoly Banker's Approval</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -25,13 +26,75 @@
             },
         }
 
-         // Function to hide flash messages after 5 seconds (5000 milliseconds)
-         window.setTimeout(function() {
+        // Function to hide flash messages after 3 seconds
+        window.setTimeout(function() {
             var flashMessages = document.getElementById('flash-messages');
             if (flashMessages) {
                 flashMessages.style.display = 'none';
             }
         }, 3000);
+
+        const userTimers = {};
+
+        function updateGoButtonState(userId) {
+            const goButton = document.getElementById(`go-button-${userId}`);
+            const lastGoTime = localStorage.getItem(`lastGoTime-${userId}`);
+            const now = Date.now();
+            
+            if (lastGoTime && now - lastGoTime < 180000) { // 3 minutes in milliseconds
+                goButton.disabled = true;
+                const remainingTime = Math.ceil((180000 - (now - lastGoTime)) / 1000);
+                goButton.textContent = `GO (${remainingTime}s)`;
+                
+                if (!userTimers[userId]) {
+                    userTimers[userId] = setInterval(() => {
+                        updateGoButtonState(userId);
+                    }, 1000);
+                }
+            } else {
+                goButton.disabled = false;
+                goButton.textContent = 'GO';
+                if (userTimers[userId]) {
+                    clearInterval(userTimers[userId]);
+                    delete userTimers[userId];
+                }
+            }
+        }
+
+        function handleGo(userId) {
+            axios.post('/go', { user_id: userId })
+                .then(response => {
+                    if (response.data.success) {
+                        localStorage.setItem(`lastGoTime-${userId}`, Date.now());
+                        updateGoButtonState(userId);
+                        document.getElementById('flash-messages').innerHTML = `
+                            <div class="max-w-md mx-auto mb-8">
+                                <div class="bg-green-100 border-green-500 text-green-700 border-l-4 p-4 rounded-lg">
+                                    ${response.data.message}
+                                </div>
+                            </div>
+                        `;
+                        document.getElementById('flash-messages').style.display = 'block';
+                        setTimeout(() => {
+                            document.getElementById('flash-messages').style.display = 'none';
+                        }, 3000);
+                    } else {
+                        alert(response.data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while processing your request.');
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const users = document.querySelectorAll('[id^="go-button-"]');
+            users.forEach(user => {
+                const userId = user.id.split('-')[2];
+                updateGoButtonState(userId);
+            });
+        });
     </script>
 </head>
 <body class="font-poppins bg-gradient-to-br from-monopoly-blue to-monopoly-green min-h-screen py-12 px-4 sm:px-6 lg:px-8">
@@ -39,18 +102,33 @@
         <h1 class="text-5xl font-extrabold text-center mb-12 text-white drop-shadow-lg">Banker's Approval Page</h1>
 
         <!-- Flash messages -->
-        <div id="flash-messages"> 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        {% for category, message in messages %}
-        <div class="max-w-md mx-auto mb-8">
-            <div class="{% if category == 'success' %}bg-green-100 border-green-500 text-green-700{% elif category == 'danger' %}bg-red-100 border-red-500 text-red-700{% else %}bg-gray-100 border-gray-500 text-gray-700{% endif %} border-l-4 p-4 rounded-lg">
-                {{ message }}
+        <div id="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="max-w-md mx-auto mb-8">
+                <div class="{% if category == 'success' %}bg-green-100 border-green-500 text-green-700{% elif category == 'danger' %}bg-red-100 border-red-500 text-red-700{% else %}bg-gray-100 border-gray-500 text-gray-700{% endif %} border-l-4 p-4 rounded-lg">
+                    {{ message }}
+                </div>
             </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
         </div>
-        {% endfor %}
-        {% endif %}
-        {% endwith %}
+
+        <!-- GO Functionality -->
+        <div class="bg-white bg-opacity-90 rounded-xl shadow-2xl p-8 mb-8">
+            <h2 class="text-2xl font-semibold text-monopoly-blue mb-4">GO Functionality</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {% for user in users %}
+                <div class="flex items-center justify-between p-4 bg-gray-100 rounded-lg">
+                    <span class="font-semibold">{{ user.name }}</span>
+                    <button id="go-button-{{ user._id }}" onclick="handleGo('{{ user._id }}')" class="px-4 py-2 bg-monopoly-yellow text-monopoly-blue font-semibold rounded-lg shadow-md hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-colors duration-300">
+                        GO
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
         </div>
 
         {% if pending_requests %}

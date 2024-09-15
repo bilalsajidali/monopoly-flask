@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
 import random
+from datetime import timedelta
 
 import os
 import datetime
@@ -25,10 +26,23 @@ client = MongoClient(mongo_uri)
 db_name = 'monopoly'  # Replace with your desired database name
 db = client[db_name]
 
+GO_AMOUNT = 200000  # Set the amount to be added for GO functionality
+GO_COOLDOWN = timedelta(minutes=3)  # Set the cooldown period
+
+
+
+
+
+
 @app.before_request
 def check_login():
-    if 'user' not in session and request.endpoint not in ['login', 'play_game', 'static', 'home' ,'add_user',"delete_all_users","set_gold_rate","update_gold_rate","delete_all_bank_requests"]:
+    if 'user' not in session and request.endpoint not in ['login', 'play_game', 'static', 'home', 'add_user', "delete_all_users", "set_gold_rate", "update_gold_rate", "delete_all_bank_requests"]:
         return redirect(url_for('login'))
+    # elif 'user' in session and 'role' in session:
+    #     if session['role'] == 'banker' and request.endpoint not in ['bank_approval', 'logout']:
+    #         return redirect(url_for('bank_approval'))
+    #     elif session['role'] == 'player' and request.endpoint == 'bank_approval':
+    #         return redirect(url_for('dashboard'))
 
 def login_required(f):
     @wraps(f)
@@ -525,10 +539,10 @@ def bank_approval():
 
             flash(f'Request {decision} successfully.', 'success')
             return redirect(url_for('bank_approval'))
-
+        users = list(db.Users.find({'role': 'player'}))
         banker = db.Users.find_one({'role': 'banker'})
         total_completed_requests = banker['requests_count']
-        return render_template('bank_approval.html', pending_requests=pending_requests, total_requests=total_completed_requests)
+        return render_template('bank_approval.html', users=users, pending_requests=pending_requests, total_requests=total_completed_requests)
     
     except Exception as e:
         app.logger.error(f"Error handling bank approval: {str(e)}")
@@ -536,10 +550,46 @@ def bank_approval():
         return redirect(url_for('bank_approval'))
 
 
+#GO
+@app.route('/go', methods=['POST'])
+def go():
+    try:
+        user_id = request.json.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'message': 'User ID not provided.'}), 400
 
+        user = db.Users.find_one({'_id': ObjectId(user_id)})
 
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found.'}), 404
 
+        last_go_time = user.get('last_go_time')
+        current_time = datetime.datetime.now()
 
+        if last_go_time and current_time - last_go_time < GO_COOLDOWN:
+            time_left = GO_COOLDOWN - (current_time - last_go_time)
+            return jsonify({'success': False, 'message': f'GO is not available yet. Please wait {time_left.seconds} seconds.'}), 429
+
+        # Update user's balance and last_go_time
+        result = db.Users.update_one(
+            {'_id': ObjectId(user_id)},
+            {
+                '$inc': {'balance': GO_AMOUNT},
+                '$set': {'last_go_time': current_time}
+            }
+        )
+
+        if result.modified_count > 0:
+            return jsonify({
+                'success': True,
+                'message': f'Successfully added {GO_AMOUNT} to {user["name"]}\'s balance.'
+            }), 200
+        else:
+            return jsonify({'success': False, 'message': 'Failed to update user balance.'}), 500
+
+    except Exception as e:
+        app.logger.error(f"Error handling GO functionality: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while processing your request.'}), 500
 
 
 
