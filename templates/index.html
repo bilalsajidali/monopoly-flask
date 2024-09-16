@@ -3,66 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Page</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Monopoly - Modern Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
     <style>
-        /* Gradient flow animation for the text */
-        @keyframes gradient-flow {
-            0% {
-                background-position: 0% 50%;
-            }
-            50% {
-                background-position: 100% 50%;
-            }
-            100% {
-                background-position: 0% 50%;
-            }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
         }
-
-        /* Custom style for flowing gradient text */
-        .animate-gradient-flow {
-            background: linear-gradient(90deg, #ff007f, #ff7e00, #00ff9f, #00aaff, #ff00aa);
-            background-size: 200% 200%;
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-            animation: gradient-flow 5s ease infinite;
-        }
-
-        /* Monopoly-themed background */
-        .monopoly-bg {
-            background-image: url('../static/wallpaperflare.com_wallpaper\ \(1\).jpg'); /* Replace with actual Monopoly board image URL */
-            background-size: cover;
-            background-position: center;
-        }
+        .floating { animation: float 3s ease-in-out infinite; }
+        .card-hover:hover { transform: translateY(-5px); }
     </style>
 </head>
-<body class="min-h-screen flex flex-col monopoly-bg">
-
-    <!-- Main Content -->
-<div class="container mx-auto text-center py-16 flex-grow">
-    <h1 class="text-6xl font-extrabold animate-gradient-flow bg-clip-text text-transparent">
-        Welcome to Monopoly
-    </h1>
-    <div class="flex justify-center mt-64">
-        <!-- Buttons Container -->
-        <div class="flex space-x-2  mt-40"> <!-- 'space-x-4' adds spacing between buttons -->
-            <div class="p-8">
-                <a href="/play_game" class="inline-block px-8 py-3 text-lg font-semibold text-white bg-green-500 rounded-full hover:bg-green-600 shadow-lg transform transition-transform hover:-translate-y-1">
-                    Play Game
+<body class="min-h-screen flex flex-col bg-gradient-to-br from-blue-900 via-purple-900 to-pink-800 text-white">
+    <div class="container mx-auto px-4 py-12 flex-grow flex flex-col items-center justify-center relative">
+        <h1 id="title" class="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500 mb-12 opacity-0">
+            Monopoly
+            <span class="text-3xl block mt-2">Management System</span>
+        </h1>
+        
+        <div id="gameOptions" class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl opacity-0">
+            <div class="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg transition duration-300 ease-in-out transform hover:scale-105 card-hover">
+                <h2 class="text-2xl font-bold mb-4">Quick Play</h2>
+                <p class="mb-4">Start a new game with default settings.</p>
+                <a href="/play_game" class="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300">
+                    Start Game
                 </a>
             </div>
-            <div class="p-8">
-                <a href="/add_user" class="inline-block px-8 py-3 text-lg font-semibold text-white bg-green-500 rounded-full hover:bg-green-600 shadow-lg transform transition-transform hover:-translate-y-1">
+            <div class="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg transition duration-300 ease-in-out transform hover:scale-105 card-hover">
+                <h2 class="text-2xl font-bold mb-4">Add Users</h2>
+                <p class="mb-4">Add players in game.</p>
+                <a href="/add_user" class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300">
                     Add Users
                 </a>
             </div>
         </div>
+        
+        <div id="tokenContainer" class="mt-12 flex justify-center space-x-8 opacity-0">
+            <!-- Tokens will be dynamically added here -->
+        </div>
     </div>
-</div>
 
+    <div id="propertyCards" class="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
+        <!-- Property cards will be dynamically added here -->
+    </div>
 
-    <!-- Tailwind JS -->
-    <script src="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.js"></script>
+    <script>
+        const tokens = ['🎩', '🚗', '🐕', '🚢', '👞', '🐈'];
+        const propertyColors = ['bg-red-500', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500'];
+
+        function createTokens() {
+            const container = document.getElementById('tokenContainer');
+            tokens.forEach(token => {
+                const tokenElement = document.createElement('div');
+                tokenElement.className = 'text-4xl floating cursor-pointer transition duration-300 hover:scale-125';
+                tokenElement.textContent = token;
+                container.appendChild(tokenElement);
+            });
+        }
+
+        function createPropertyCards() {
+            const container = document.getElementById('propertyCards');
+            for (let i = 0; i < 10; i++) {
+                const card = document.createElement('div');
+                card.className = `absolute ${propertyColors[i % propertyColors.length]} w-16 h-24 rounded-lg opacity-50 transform rotate-${Math.floor(Math.random() * 360)}`;
+                card.style.left = `${Math.random() * 100}%`;
+                card.style.top = `${Math.random() * 100}%`;
+                container.appendChild(card);
+
+                gsap.to(card, {
+                    x: `random(-50, 50)`,
+                    y: `random(-50, 50)`,
+                    rotation: `random(-45, 45)`,
+                    duration: 10,
+                    repeat: -1,
+                    yoyo: true,
+                    ease: "sine.inOut"
+                });
+            }
+        }
+
+        function animateElements() {
+            gsap.to("#title", {duration: 1, opacity: 1, y: 20, ease: "power3.out"});
+            gsap.to("#gameOptions", {duration: 1, opacity: 1, y: 20, delay: 0.5, ease: "power3.out"});
+            gsap.to("#tokenContainer", {duration: 1, opacity: 1, delay: 1, ease: "power3.out"});
+        }
+
+        // Initialize
+        createTokens();
+        createPropertyCards();
+        animateElements();
+    </script>
 </body>
 </html>
