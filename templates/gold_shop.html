@@ -24,13 +24,13 @@
                 },
             },
         }
-         // Function to hide flash messages after 5 seconds (5000 milliseconds)
-         window.setTimeout(function() {
+        // Function to hide flash messages after 5 seconds (5000 milliseconds)
+        window.setTimeout(function() {
             var flashMessages = document.getElementById('flash-messages');
             if (flashMessages) {
                 flashMessages.style.display = 'none';
             }
-        }, 2000);
+        }, 5000);
     </script>
 </head>
 <body class="font-poppins bg-gradient-to-br from-monopoly-blue to-monopoly-green min-h-screen py-12 px-4 sm:px-6 lg:px-8">
@@ -56,16 +56,16 @@
             <!-- Buy Gold Card -->
             <div class="bg-white p-8 rounded-xl shadow-2xl">
                 <h2 class="text-3xl font-bold mb-6 text-monopoly-yellow">Buy Gold</h2>
-                <p class="text-gray-600 mb-6">Current Gold Rate: <span class="font-semibold">PKR {{ gold_buy_rate }}</span></p>
+                <p class="text-gray-600 mb-6">Current Gold Rate: <span class="font-semibold">PKR {{ gold_buy_rate }} per gram</span></p>
                 <form action="{{ url_for('gold_shop', user=current_user) }}" method="POST">
                     <input type="hidden" name="current_user" value="{{ current_user }}">
                     <div class="mb-6">
-                        <label for="buy_amount" class="block text-gray-700 font-semibold mb-2">Gold Quantity:</label>
-                        <input type="number" id="buy_amount" name="buy_amount" class="w-full px-4 py-2 rounded-lg bg-gray-100 border-transparent focus:border-monopoly-yellow focus:bg-white focus:ring-0" step="0.01" min="0" required>
+                        <label for="buy_cash" class="block text-gray-700 font-semibold mb-2">Cash Amount (PKR):</label>
+                        <input type="number" id="buy_cash" name="buy_cash" class="w-full px-4 py-2 rounded-lg bg-gray-100 border-transparent focus:border-monopoly-yellow focus:bg-white focus:ring-0" step="0.01" min="0" required>
                     </div>
                     <div class="mb-6">
-                        <label for="buy_bill" class="block text-gray-700 font-semibold mb-2">Total Bill:</label>
-                        <input type="text" id="buy_bill" class="w-full px-4 py-2 rounded-lg bg-gray-100 border-transparent focus:border-monopoly-yellow focus:bg-white focus:ring-0" value="0.00 PKR" readonly>
+                        <label for="buy_quantity" class="block text-gray-700 font-semibold mb-2">Gold Quantity:</label>
+                        <input type="text" id="buy_quantity" class="w-full px-4 py-2 rounded-lg bg-gray-100 border-transparent focus:border-monopoly-yellow focus:bg-white focus:ring-0" value="0.00 grams" readonly>
                     </div>
                     <input type="hidden" name="action" value="buy">
                     <button type="submit" class="w-full px-6 py-3 bg-monopoly-yellow text-gray-800 font-bold rounded-lg shadow-md hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-colors duration-300">Buy Now</button>
@@ -99,17 +99,18 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            var buyAmount = document.getElementById('buy_amount');
-            var buyBill = document.getElementById('buy_bill');
+            var buyCash = document.getElementById('buy_cash');
+            var buyQuantity = document.getElementById('buy_quantity');
             var sellAmount = document.getElementById('sell_amount');
             var sellMoney = document.getElementById('sell_money');
-            var goldBuyRate = parseFloat('{{ gold_buy_rate|default(0) }}');  // Ensure gold_buy_rate is defined and converted to a number
-            var goldSellRate = parseFloat('{{ gold_sell_rate|default(0) }}');  // Ensure gold_sell_rate is defined and converted to a number
+            var goldBuyRate = parseFloat('{{ gold_buy_rate|default(0) }}');
+            var goldSellRate = parseFloat('{{ gold_sell_rate|default(0) }}');
     
-            if (buyAmount) {
-                buyAmount.addEventListener('input', function() {
-                    var quantity = parseFloat(buyAmount.value) || 0;
-                    buyBill.value = `${(goldBuyRate * quantity).toFixed(2)} PKR`;
+            if (buyCash) {
+                buyCash.addEventListener('input', function() {
+                    var cash = parseFloat(buyCash.value) || 0;
+                    var quantity = cash / goldBuyRate;
+                    buyQuantity.value = `${quantity.toFixed(1)} grams`;
                 });
             }
     

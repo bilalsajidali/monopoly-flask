@@ -1,11 +1,12 @@
 from flask import Flask,session, render_template, request, redirect, url_for, flash , jsonify , make_response
 from bson import ObjectId
-from pymongo import MongoClient
+from pymongo import MongoClient , ASCENDING , errors
 from dotenv import load_dotenv
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
 import random
 from datetime import timedelta
+from pymongo.errors import DuplicateKeyError
 
 import os
 import datetime
@@ -67,24 +68,48 @@ def home():
 def add_user():
     if request.method == 'POST':
         try:
-            name = request.form.get('name')
-            user_exists=db.Users.find_one({"name": name})
-            if user_exists:
-                flash('User already Exists with same Name', "danger")
-                return redirect(url_for('add_user'))
+            name = request.form.get('name', '').lower().strip()  # Convert to lowercase and remove whitespace
             password = request.form.get('password')
-            role = 'player'
-            if name=='bilal':
-                db.Users.insert_one({'name': name, 'password': password ,  'balance': 0 , 'gold' : 0 , 'role':role , 'goldrate': 1500 ,'loan': 0})
-            elif name=='abdulrehman':
-                db.Users.insert_one({'name': name, 'password': password ,  'balance': 0 , 'gold' : 0 , 'role':'banker' , 'requests_count': 0})
+
+            # Prepare the new user document
+            new_user = {
+                'name': name,
+                'password': password,
+                'balance': 0,
+                'gold': 0,
+                'role': 'player',
+                'loan': 0
+            }
+
+            # Customize new user based on the name
+            if name == 'bilal':
+                new_user['goldrate'] = 1500
+            elif name == 'abdulrehman':
+                new_user['role'] = 'banker'
+                new_user['requests_count'] = 0
+
+            # Try to insert the new user, will raise DuplicateKeyError if name already exists
+            result = db.Users.insert_one(new_user)
+
+            if result.inserted_id:
+                flash('User Added!', 'success')
             else:
-                db.Users.insert_one({'name': name, 'password': password ,  'balance': 0 , 'gold' : 0 , 'role':role, 'loan': 0})    
-            flash('User Added!', 'success')  # Flash a success message
+                flash('Failed to add user. Please try again.', 'danger')
+
             return redirect(url_for('add_user'))
+
+        # Handle duplicate key error if the user name already exists
+        except DuplicateKeyError:
+            flash('User already exists with the same name', "danger")
+            return redirect(url_for('add_user'))
+
+        # Handle any other general exceptions
         except Exception as e:
             print("Error adding user:", e)
-            return "Failed to add user.", 500
+            flash('An error occurred while adding the user.', 'danger')
+            return redirect(url_for('add_user'))
+
+    # Render the add user form if GET request
     return render_template('add_user.html')
 
 
@@ -190,14 +215,13 @@ def gold_shop():
 
         if current_user == 'bilal':
             # Bilal has different rates for buying and selling
-            buy_rate =  bank_gold_rate - (seller_rate*2)
+            buy_rate = bank_gold_rate - (seller_rate*1)
             sell_rate = bank_gold_rate
 
         if request.method == 'POST':
             action = request.form.get('action')
 
             if action in ['buy', 'sell']:
-                amount = float(request.form.get(f'{action}_amount', 0))
                 user = db.Users.find_one({'name': current_user})
                 
                 if not user:
@@ -205,7 +229,10 @@ def gold_shop():
                     return redirect(url_for('gold_shop', user=current_user))
 
                 if action == 'buy':
-                    total_cost = buy_rate * amount
+                    cash_amount = float(request.form.get('buy_cash', 0))
+                    amount = cash_amount / buy_rate  # Calculate gold quantity based on cash input
+                    total_cost = cash_amount
+
                     if user['balance'] < total_cost:
                         flash('Insufficient balance to buy gold.', 'danger')
                     elif current_user != 'bilal' and gold_seller_user["gold"] < amount:
@@ -226,7 +253,7 @@ def gold_shop():
                                 )
 
                                 if buyer_result.modified_count > 0 and seller_result.modified_count > 0:
-                                    flash('Gold purchased successfully!', 'success')
+                                    flash(f'Gold purchased successfully! You bought {amount:.4f} units of gold for {total_cost:.2f} PKR.', 'success')
                                 else:
                                     # Rollback if one update succeeded but the other failed
                                     if buyer_result.modified_count > 0:
@@ -245,12 +272,13 @@ def gold_shop():
                                     {'name': current_user},
                                     {'$inc': {'balance': -total_cost, 'gold': amount}}
                                 )
-                                flash('Gold purchased successfully!' if result.modified_count > 0 else 'Failed to purchase gold.', 'success' if result.modified_count > 0 else 'danger')
+                                flash(f'Gold purchased successfully! You bought {amount:.4f} units of gold for {total_cost:.2f} PKR.' if result.modified_count > 0 else 'Failed to purchase gold.', 'success' if result.modified_count > 0 else 'danger')
                         except Exception as e:
                             app.logger.error(f"Error during gold purchase: {str(e)}")
                             flash('An error occurred during the purchase. Please try again.', 'danger')
 
                 elif action == 'sell':
+                    amount = float(request.form.get('sell_amount', 0))
                     total_money = sell_rate * amount
                     if user['gold'] < amount:
                         flash('Insufficient gold to sell.', 'danger')
@@ -264,21 +292,15 @@ def gold_shop():
                                 )
 
                                 if seller_result.modified_count > 0:
-                                    flash('Gold sold successfully!', 'success')
+                                    flash(f'Gold sold successfully! You sold {amount:.4f} units of gold for {total_money:.2f} PKR.', 'success')
                                 else:
-                                    # Rollback if one update succeeded but the other failed
-                                    if seller_result.modified_count > 0:
-                                        db.Users.update_one(
-                                            {'name': current_user},
-                                            {'$inc': {'balance': -total_money, 'gold': amount}}
-                                        )
                                     flash('Failed to sell gold. Please try again.', 'danger')
                             else:  # Bilal selling gold
                                 result = db.Users.update_one(
                                     {'name': current_user},
                                     {'$inc': {'balance': total_money, 'gold': -amount}}
                                 )
-                                flash('Gold sold successfully!' if result.modified_count > 0 else 'Failed to sell gold.', 'success' if result.modified_count > 0 else 'danger')
+                                flash(f'Gold sold successfully! You sold {amount:.4f} units of gold for {total_money:.2f} PKR.' if result.modified_count > 0 else 'Failed to sell gold.', 'success' if result.modified_count > 0 else 'danger')
                         except Exception as e:
                             app.logger.error(f"Error during gold sale: {str(e)}")
                             flash('An error occurred during the sale. Please try again.', 'danger')
@@ -287,100 +309,11 @@ def gold_shop():
 
             return redirect(url_for('gold_shop', user=current_user))
 
-        return render_template('gold_shop.html', current_user=current_user, gold_buy_rate=buy_rate , gold_sell_rate=sell_rate)
+        return render_template('gold_shop.html', current_user=current_user, gold_buy_rate=buy_rate, gold_sell_rate=sell_rate)
     except Exception as e:
         app.logger.error(f"Error handling gold shop: {str(e)}")
         flash('An error occurred while processing your request.', 'danger')
         return redirect(url_for('gold_shop', user=current_user))
-    try:
-        current_user = request.args.get('user')
-        if not current_user:
-            flash('No current user found.', 'danger')
-            return redirect(url_for('home'))
-
-        gold_seller_user= db.Users.find_one({'name':'bilal'})
-        bank_gold_rate=gold_seller_user["goldrate"]
-        seller_rate=bank_gold_rate/100*20
-        
-        # Default rates for other users
-        buy_rate = bank_gold_rate + seller_rate
-        sell_rate = bank_gold_rate + seller_rate
-
-        if current_user == 'bilal':
-            # Bilal has different rates for buying and selling
-            buy_rate = bank_gold_rate - seller_rate
-            sell_rate = bank_gold_rate + seller_rate
-
-        print("goldrate from bank", bank_gold_rate)
-
-
-        if request.method == 'POST':
-            action = request.form.get('action')
-
-            if action in ['buy', 'sell']:
-                amount = float(request.form.get(f'{action}_amount', 0))
-                user = db.Users.find_one({'name': current_user})
-                
-                if not user:
-                    flash('User not found.', 'danger')
-                    return redirect(url_for('gold_shop', user=current_user))
-
-                if action == 'buy' and current_user!='bilal':
-                    total_cost = buy_rate * amount
-                    if user['balance'] < total_cost:
-                        flash('Insufficient balance to buy gold.', 'danger')
-                    elif gold_seller_user["gold"]<amount:
-                        flash('Insufficient Gold reserves in Seller Account!' , 'danger')
-                    else:                       
-                        buyer_result = db.Users.update_one(
-                        {'name': current_user},
-                        {'$inc': {'balance': -total_cost, 'gold': amount}},
-                       
-                    )
-
-                    # Update seller
-                    seller_result = db.Users.update_one(
-                        {'name': gold_seller_user['name']},  # Assume gold_seller_user is a dictionary
-                        {'$inc': {'balance': total_cost, 'gold': -amount}},
-                        
-                    )
-
-                    if buyer_result.modified_count > 0 and seller_result.modified_count > 0:
-                        flash('Gold purchased successfully!', 'success') 
-                    else:
-                        flash('Failed to Purchase Gold!','danger')
-                elif action == 'buy' and current_user =='bilal':
-                    total_cost = buy_rate * amount
-                    if user['balance'] < total_cost:
-                        flash('Insufficient balance to buy gold.', 'danger')
-                    else:
-                        result = db.Users.update_one(
-                            {'name': current_user},
-                            {'$inc': {'balance': -total_cost, 'gold': amount}}
-                        )
-                        flash('Gold purchased successfully!' if result.modified_count > 0 else 'Failed to purchase gold.', 'success' if result.modified_count > 0 else 'danger')
-               
-                else:  # sell
-                    total_money = sell_rate * amount
-                    if user['gold'] < amount:
-                        flash('Insufficient gold to sell.', 'danger')
-                    else:
-                        result = db.Users.update_one(
-                            {'name': current_user},
-                            {'$inc': {'balance': total_money, 'gold': -amount}}
-                        )
-                        flash('Gold sold successfully!' if result.modified_count > 0 else 'Failed to sell gold.', 'success' if result.modified_count > 0 else 'danger')
-            else:
-                flash('Invalid action.', 'danger')
-
-            return redirect(url_for('gold_shop', user=current_user))
-
-        return render_template('gold_shop.html', current_user=current_user, gold_rate=buy_rate)
-    except Exception as e:
-        app.logger.error(f"Error handling gold shop: {str(e)}")
-        flash('An error occurred while processing your request.', 'danger')
-        return redirect(url_for('gold_shop', user=current_user))
-
 @app.route('/transfers', methods=['GET', 'POST'])
 @login_required
 def transfers():

@@ -39,11 +39,11 @@
 
         function formatGold(value) {
             if (value >= 1e6) {
-                return (value / 1e6).toFixed(1) + ' ton'; // ton for tons
+                return (value / 1e6).toFixed(3) + ' ton'; // 3 decimal places for tons
             } else if (value >= 1e3) {
-                return (value / 1e3).toFixed(1) + ' kg'; // kg for kilograms
+                return (value / 1e3).toFixed(3) + ' kg'; // 3 decimal places for kilograms
             } else {
-                return value + ' g'; // For values less than 1000 grams
+                return value.toFixed(3) + ' g'; // 3 decimal places for grams
             }
         }
 
