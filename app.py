@@ -170,18 +170,15 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # user_name = request.args.get('user')
-    # if not user_name:
-    #     return redirect(url_for('home'))
-    
     try:
         user = db.Users.find_one({'name': session['user']})
+        deeds= db.Deeds.find({'owner':user['name']})
         if not user:
             session.clear()
             flash('User not found.','danger')
             return redirect(url_for('login'))
 
-        response = make_response(render_template('dashboard.html', user=user))
+        response = make_response(render_template('dashboard.html', user=user , deeds=deeds))
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'

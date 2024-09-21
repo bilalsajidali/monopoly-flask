@@ -122,6 +122,31 @@
                 </div>
             </div>
         </div>
+        
+        <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-lg rounded-xl p-8 shadow-2xl mb-12">
+            <h2 class="text-3xl font-bold text-monopoly-blue mb-4">Your Properties</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for deed in deeds %}
+                <div class="bg-{{ deed.color }}-100 rounded-xl p-4 shadow-md">
+                    <h3 class="text-xl font-bold mb-2">{{ deed.name }}</h3>
+                    <p class="text-gray-600">Current Value: PKR: {{ deed.price | round | int }}</p>
+                    <p class="text-gray-600">Current Rent: PKR: {{ deed.rent | round | int }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Auction Section -->
+        <div id="auction-section" class="hidden bg-white bg-opacity-90 backdrop-filter backdrop-blur-lg rounded-xl p-8 shadow-2xl mb-12">
+            <h2 class="text-3xl font-bold text-monopoly-blue mb-4">Active Auction</h2>
+            <div id="auction-card" class="bg-white rounded-xl p-6 shadow-xl">
+                <h3 id="auction-deed-name" class="text-2xl font-bold mb-2"></h3>
+                <p id="auction-current-price" class="text-xl mb-2"></p>
+                <p id="auction-highest-bidder" class="text-lg mb-4"></p>
+                <button id="place-bid" class="bg-monopoly-green text-white font-bold py-2 px-4 rounded">Place Bid</button>
+                <button id="flop-auction" class="bg-monopoly-red text-white font-bold py-2 px-4 rounded ml-2">Flop</button>
+            </div>
+        </div>
 
         <!-- Cards Grid -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -151,5 +176,51 @@
             <a href="{{ url_for('logout') }}" class="inline-block px-8 py-4 bg-monopoly-red text-white font-bold rounded-full hover:bg-red-600 transition-all duration-300 transform hover:scale-105">Logout</a>
         </div>
     </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentAuctionId = null;
+
+        socket.on('auction_started', (data) => {
+            currentAuctionId = data.auction_id;
+            document.getElementById('auction-section').classList.remove('hidden');
+            document.getElementById('auction-deed-name').textContent = data.deed_name;
+            document.getElementById('auction-current-price').textContent = `Current Price: $${data.current_price}`;
+            document.getElementById('auction-highest-bidder').textContent = 'Highest Bidder: None';
+        });
+
+        socket.on('bid_update', (data) => {
+            document.getElementById('auction-current-price').textContent = `Current Price: $${data.current_price}`;
+            document.getElementById('auction-highest-bidder').textContent = `Highest Bidder: ${data.highest_bidder}`;
+        });
+
+        socket.on('auction_ended', (data) => {
+            alert(`Auction ended! ${data.deed_name} sold to ${data.winner} for $${data.final_price}`);
+            document.getElementById('auction-section').classList.add('hidden');
+            currentAuctionId = null;
+        });
+
+        document.getElementById('place-bid').addEventListener('click', () => {
+            if (currentAuctionId) {
+                socket.emit('place_bid', {
+                    user_id: '{{ user._id }}',
+                    auction_id: currentAuctionId
+                });
+            }
+        });
+
+        document.getElementById('flop-auction').addEventListener('click', () => {
+            if (currentAuctionId) {
+                socket.emit('flop_auction', {
+                    user_id: '{{ user._id }}',
+                    auction_id: currentAuctionId
+                });
+                alert('You have flopped out of this auction.');
+                document.getElementById('place-bid').disabled = true;
+                document.getElementById('flop-auction').disabled = true;
+            }
+        });
+    </script>
 </body>
 </html>
