@@ -88,6 +88,39 @@
                 });
         }
 
+        function assignDeed() {
+            const deedId = document.getElementById('deed-select').value;
+            const userId = document.getElementById('user-select').value;
+
+            axios.post('/assign-deed', { deed_id: deedId, user_id: userId })
+                .then(response => {
+                    if (response.data.success) {
+                        // Remove the assigned deed from the select options
+                        const deedOption = document.querySelector(`option[value="${deedId}"]`);
+                        deedOption.remove();
+
+                        // Show success message
+                        document.getElementById('flash-messages').innerHTML = `
+                            <div class="max-w-md mx-auto mb-8">
+                                <div class="bg-green-100 border-green-500 text-green-700 border-l-4 p-4 rounded-lg">
+                                    ${response.data.message}
+                                </div>
+                            </div>
+                        `;
+                        document.getElementById('flash-messages').style.display = 'block';
+                        setTimeout(() => {
+                            document.getElementById('flash-messages').style.display = 'none';
+                        }, 3000);
+                    } else {
+                        alert(response.data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while assigning the deed.');
+                });
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const users = document.querySelectorAll('[id^="go-button-"]');
             users.forEach(user => {
@@ -128,6 +161,28 @@
                     </button>
                 </div>
                 {% endfor %}
+            </div>
+        </div>
+
+        <!-- Deed Assignment -->
+        <div class="bg-white bg-opacity-90 rounded-xl shadow-2xl p-8 mb-8">
+            <h2 class="text-2xl font-semibold text-monopoly-blue mb-4">Assign Deed</h2>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <select id="deed-select" class="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-monopoly-blue focus:border-monopoly-blue">
+                    <option value="">Select a deed</option>
+                    {% for deed in deeds %}
+                    <option value="{{ deed._id }}">{{ deed.name }}</option>
+                    {% endfor %}
+                </select>
+                <select id="user-select" class="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-monopoly-blue focus:border-monopoly-blue">
+                    <option value="">Select a user</option>
+                    {% for user in users %}
+                    <option value="{{ user._id }}">{{ user.name }}</option>
+                    {% endfor %}
+                </select>
+                <button onclick="assignDeed()" class="px-4 py-2 bg-monopoly-green text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors duration-300">
+                    Assign Deed
+                </button>
             </div>
         </div>
 

@@ -469,10 +469,11 @@ def bank_approval():
 
             flash(f'Request {decision} successfully.', 'success')
             return redirect(url_for('bank_approval'))
+        deeds= db.Deeds.find({"owner":None})
         users = list(db.Users.find({'role': 'player'}))
         banker = db.Users.find_one({'role': 'banker'})
         total_completed_requests = banker['requests_count']
-        return render_template('bank_approval.html', users=users, pending_requests=pending_requests, total_requests=total_completed_requests)
+        return render_template('bank_approval.html',deeds=deeds, users=users, pending_requests=pending_requests, total_requests=total_completed_requests)
     
     except Exception as e:
         app.logger.error(f"Error handling bank approval: {str(e)}")
@@ -524,7 +525,52 @@ def go():
 
 
 
+#assign deed
 
+@app.route('/assign-deed', methods=['POST'])
+def assign_deed():
+    try:
+        data = request.json
+        deed_id = data.get('deed_id')
+        user_id = data.get('user_id')
+
+        if not deed_id or not user_id:
+            return jsonify({'success': False, 'message': 'Deed ID and User ID are required.'}), 400
+
+        # Find the deed and user
+        deed = db.Deeds.find_one({'_id': ObjectId(deed_id)})
+        user = db.Users.find_one({'_id': ObjectId(user_id)})
+
+        if not deed or not user:
+            return jsonify({'success': False, 'message': 'Deed or User not found.'}), 404
+
+        # Check if the deed is already assigned
+        if deed.get('owner'):
+            return jsonify({'success': False, 'message': 'This deed is already assigned to a user.'}), 400
+
+        # Assign the deed to the user
+        result = db.Deeds.update_one(
+            {'_id': ObjectId(deed_id)},
+            {'$set': {'owner': user['name']}}
+        )
+
+        if result.modified_count > 0:
+            # Update user's deeds list (assuming you have a 'deeds' field in the Users collection)
+            db.Users.update_one(
+                {'_id': ObjectId(user_id)},
+                {'$push': {'deeds': deed['name']}}
+            )
+
+            return jsonify({
+                'success': True,
+                'message': f"Deed '{deed['name']}' successfully assigned to {user['name']}."
+            }), 200
+        else:
+            return jsonify({'success': False, 'message': 'Failed to assign deed. Please try again.'}), 500
+
+    except Exception as e:
+        app.logger.error(f"Error assigning deed: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while assigning the deed.'}), 500
 
 
 
