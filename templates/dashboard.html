@@ -234,6 +234,8 @@
                     setTimeout(updateTimer, 1000);
                 } else {
                     timerElement.textContent = 'Auction Ended';
+                    document.getElementById(`place-bid-btn-${auctionId}`).style.display = 'none'; // Remove the "Place Bid" button
+
                 }
             }
 
@@ -265,6 +267,7 @@
                 user: user,
                 bid_amount: bidAmount
             });
+            bidInput.value = '';
         }
 
         socket.on('connect', () => {
@@ -291,15 +294,31 @@
 
         socket.on('auction_update', (auction) => {
             console.log('Received auction update:', auction);
-            activeAuctions[auction._id] = auction;
-            updateAuctionUI();
+
+            // Update only the specific auction that changed
+            const auctionCard = document.getElementById(`auction-card-${auction._id}`);
+            if (auctionCard) {
+                const currentBidElement = auctionCard.querySelector('.current-bid');
+                const highestBidderElement = auctionCard.querySelector('.highest-bidder');
+
+                currentBidElement.textContent = `Current Bid: PKR ${auction.current_bid}`;
+                highestBidderElement.textContent = `Highest Bidder: ${auction.highest_bidder || 'None'}`;
+            } else {
+                // If the auction card doesn't exist (e.g., new auction), update the whole UI
+                activeAuctions[auction._id] = auction;
+                updateAuctionUI();
+            }
         });
 
         socket.on('auction_ended', (data) => {
             console.log('Auction ended:', data);
             delete activeAuctions[data.auction_id];
             updateAuctionUI();
-            alert(`Auction for ${data.deed_name} ended. Winner: ${data.winner}, Winning Bid: PKR ${data.winning_bid}`);
+            if (data.winner) {
+                alert(`Auction for ${data.deed_name} ended. Winner: ${data.winner}, Winning Bid: PKR ${data.winning_bid}`);
+            } else {
+                alert(`Auction for ${data.deed_name} ended. ${data.message}`);
+            }
         });
 
 

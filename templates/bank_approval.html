@@ -89,6 +89,11 @@
                         // Remove the assigned deed from the select options
                         const deedOption = document.querySelector(`option[value="${deedId}"]`);
                         deedOption.remove();
+
+                        // Clear fields after deed assignment
+                        document.getElementById('deed-select').value = '';
+                        document.getElementById('user-select').value = '';
+
                         showFlashMessage(response.data.message, 'success');
                     } else {
                         alert(response.data.message);
@@ -121,19 +126,25 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showFlashMessage('Auction created successfully!', 'success');
-                    // You might want to update the UI to show the new auction
-                } else {
-                    showFlashMessage('Failed to create auction: ' + data.message, 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showFlashMessage('An error occurred while creating the auction.', 'error');
-            });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showFlashMessage('Auction created successfully!', 'success');
+
+                        // Clear fields after auction creation
+                        document.getElementById('deed-select').value = '';
+                        document.getElementById('starting-bid').value = '';
+                        document.getElementById('bid-increment').value = '';
+                        document.getElementById('auction-duration').value = '';
+
+                    } else {
+                        showFlashMessage('Failed to create auction: ' + data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showFlashMessage('An error occurred while creating the auction.', 'error');
+                });
         }
 
         function showFlashMessage(message, type) {
