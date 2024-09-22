@@ -1,5 +1,5 @@
 from flask import Flask,session, render_template, request, redirect, url_for, flash , jsonify , make_response
-from bson import ObjectId
+from bson import ObjectId , json_util
 from pymongo import MongoClient , ASCENDING , errors
 from dotenv import load_dotenv
 from functools import wraps
@@ -7,10 +7,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import random
 from datetime import timedelta
 from pymongo.errors import DuplicateKeyError
-
+from flask_socketio import SocketIO, emit, join_room, leave_room
+import threading
 import os
 import datetime
 import pytz
+import json
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,6 +33,8 @@ db = client[db_name]
 GO_AMOUNT = 200000  # Set the amount to be added for GO functionality
 GO_COOLDOWN = timedelta(minutes=3)  # Set the cooldown period
 
+socketio = SocketIO(app)
+
 
 
 
@@ -37,7 +42,7 @@ GO_COOLDOWN = timedelta(minutes=3)  # Set the cooldown period
 
 @app.before_request
 def check_login():
-    if 'user' not in session and request.endpoint not in ['login', 'play_game', 'static', 'home', 'add_user', "delete_all_users", "set_gold_rate", "update_gold_rate", "delete_all_bank_requests"]:
+    if 'user' not in session and request.endpoint not in ["create_deed",'get_active_auctions','login', 'play_game', 'static', 'home', 'add_user', "delete_all_users", "set_gold_rate", "update_gold_rate", "delete_all_bank_requests"]:
         return redirect(url_for('login'))
     # elif 'user' in session and 'role' in session:
     #     if session['role'] == 'banker' and request.endpoint not in ['bank_approval', 'logout']:
@@ -311,6 +316,7 @@ def gold_shop():
         app.logger.error(f"Error handling gold shop: {str(e)}")
         flash('An error occurred while processing your request.', 'danger')
         return redirect(url_for('gold_shop', user=current_user))
+
 @app.route('/transfers', methods=['GET', 'POST'])
 @login_required
 def transfers():
@@ -573,10 +579,50 @@ def assign_deed():
         return jsonify({'success': False, 'message': 'An error occurred while assigning the deed.'}), 500
 
 
+@app.route('/createdeeds', methods=['POST'])
+def create_deed():
+    try:
+        # Fetch the goldrate from the user 'bilal'
+        bilal = db.Users.find_one({'name': 'bilal'})
+        goldrate = bilal.get('goldrate', 1)  # Default goldrate to 1 if not found
 
+        # Define base prices for the deeds
+        deeds_data = [
+            {"name": "Deed 1", "color": "Red", "baseprice": 200},
+            {"name": "Deed 2", "color": "Blue", "baseprice": 300},
+            {"name": "Deed 3", "color": "Green", "baseprice": 400},
+            {"name": "Deed 4", "color": "Yellow", "baseprice": 500},
+            {"name": "Deed 5", "color": "Purple", "baseprice": 600},
+            {"name": "Deed 6", "color": "Orange", "baseprice": 700}
+        ]
 
+        # Calculate price and rent dynamically based on the goldrate
+        deeds = []
+        for deed in deeds_data:
+            price = deed['baseprice'] * goldrate
+            rent = price / 2
+            deeds.append({
+                "name": deed["name"],
+                "color": deed["color"],
+                "price": price,
+                "rent": rent
+            })
 
+        # Insert deeds into the Deeds collection in MongoDB
+        result = db.Deeds.insert_many(deeds)
 
+        if result.inserted_ids:
+            return jsonify({
+                'success': True,
+                'message': '6 deeds successfully created.',
+                'deeds_created': [str(deed_id) for deed_id in result.inserted_ids]
+            }), 201
+        else:
+            return jsonify({'success': False, 'message': 'Failed to create deeds. Please try again.'}), 500
+
+    except Exception as e:
+        app.logger.error(f"Error creating deeds: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while creating deeds.'}), 500
 
 
 
@@ -639,8 +685,238 @@ def delete_all_bank_requests():
     return jsonify({"message": f"Deleted {result.deleted_count} bankrequests from the database"}), 200
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#auction system
+
+
+# Auction data structure
+auctions = {}
+@app.route('/create_auction', methods=['POST'])
+def create_auction():
+    try:
+        deed_id = request.form.get('deed_id')
+        starting_bid = request.form.get('starting_bid')
+        increment = request.form.get('increment')
+        duration = request.form.get('duration')
+
+        # Validate input
+        if not all([deed_id, starting_bid, increment, duration]):
+            return jsonify({'success': False, 'message': 'All fields are required.'})
+
+        try:
+            starting_bid = float(starting_bid)
+            increment = float(increment)
+            duration = int(duration)
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Invalid numeric values provided.'})
+
+        deed = db.Deeds.find_one({'_id': ObjectId(deed_id)})
+        if not deed:
+            return jsonify({'success': False, 'message': 'Deed not found.'})
+
+        
+        auction = {
+            '_id': ObjectId(),
+            'deed_id': ObjectId(deed_id),
+            'deed_name': deed['name'],
+            'deed_color': deed['color'],
+            'deed_price': deed['price'],
+            'deed_rent': deed['rent'],
+            'starting_bid': starting_bid,
+            'current_bid': starting_bid,
+            'increment': increment,
+            'highest_bidder': None,
+            'participants': [],
+            'status': 'active',
+            'end_time': datetime.datetime.now() + datetime.timedelta(seconds=duration)
+        }
+        result = db.Auctions.insert_one(auction)
+        auction_id = str(result.inserted_id)
+        schedule_auction_end(auction_id)
+        # Schedule auction end
+        threading.Timer(duration, end_auction, [auction_id]).start()
+
+        return jsonify({'success': True, 'auction_id': auction_id})
+
+    except Exception as e:
+        app.logger.error(f"Error in create_auction: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while creating the auction.'})
+
+@app.route('/get_active_auctions')
+def get_active_auctions():
+    active_auctions = list(db.Auctions.find({'status': 'active'}))
+    app.logger.info(f"Fetched {len(active_auctions)} active auctions")
+    app.logger.debug(f"Auctions: {active_auctions}")
+    for auction in active_auctions:
+        auction['_id'] = str(auction['_id'])
+        auction['deed_id'] = str(auction['deed_id'])
+    return jsonify(active_auctions)
+
+@socketio.on('join_auction')
+def on_join_auction(data):
+    auction_id = data['auction_id']
+    user = data['user']
+    auction = db.Auctions.find_one({'_id': ObjectId(auction_id), 'status': 'active'})
+    if auction:
+        join_room(auction_id)
+        db.Auctions.update_one(
+            {'_id': ObjectId(auction_id)},
+            {'$addToSet': {'participants': user}}
+        )
+        auction = db.Auctions.find_one({'_id': ObjectId(auction_id)})
+        emit('auction_update', auction, room=auction_id)
+
+@socketio.on('leave_auction')
+def on_leave_auction(data):
+    auction_id = data['auction_id']
+    user = data['user']
+    if auction_id in auctions:
+        leave_room(auction_id)
+        auctions[auction_id]['participants'].remove(user)
+        emit('auction_update', auctions[auction_id], room=auction_id)
+
+
+@socketio.on('get_active_auctions')
+def handle_get_active_auctions():
+    active_auctions = list(db.Auctions.find({'status': 'active'}))
+    for auction in active_auctions:
+        schedule_auction_end(auction['_id'])
+        auction['_id'] = str(auction['_id'])
+        auction['deed_id'] = str(auction['deed_id'])
+        # Convert datetime to string
+        if 'end_time' in auction:
+            auction['end_time'] = auction['end_time'].isoformat()
+    
+    # Use json_util to handle MongoDB-specific types
+    active_auctions_json = json.loads(json_util.dumps(active_auctions))
+    emit('active_auctions', active_auctions_json)
+
+@socketio.on('place_bid')
+def on_place_bid(data):
+    auction_id = data['auction_id']
+    user = data['user']
+    bid_amount = float(data['bid_amount'])
+
+    print(f"Received bid: auction_id={auction_id}, user={user}, bid_amount={bid_amount}")  # Debug print
+
+    auction = db.Auctions.find_one({'_id': ObjectId(auction_id), 'status': 'active'})
+    if not auction:
+        emit('bid_error', {'message': 'Auction not found or not active'})
+        return
+
+    user_doc = db.Users.find_one({'name': user})
+    if not user_doc:
+        emit('bid_error', {'message': 'User not found'})
+        return
+
+    user_balance = user_doc['balance']
+
+    if bid_amount > user_balance:
+        emit('bid_error', {'message': 'Insufficient balance'})
+    elif bid_amount <= auction['current_bid']:
+        emit('bid_error', {'message': 'Bid must be higher than current bid'})
+    else:
+        # Update the auction
+        db.Auctions.update_one(
+            {'_id': ObjectId(auction_id)},
+            {'$set': {'current_bid': bid_amount, 'highest_bidder': user}}
+        )
+        
+        # Emit update to all clients
+        updated_auction = db.Auctions.find_one({'_id': ObjectId(auction_id)})
+        updated_auction['_id'] = str(updated_auction['_id'])
+        updated_auction['deed_id'] = str(updated_auction['deed_id'])
+        if 'end_time' in updated_auction:
+            updated_auction['end_time'] = updated_auction['end_time'].isoformat()
+        
+        socketio.emit('auction_update', updated_auction, room=auction_id)
+        
+        # Emit success to the bidder
+        emit('bid_placed', {
+            'auction_id': auction_id,
+            'new_bid': bid_amount,
+            'bidder': user
+        })
+
+        print(f"Bid placed successfully: auction_id={auction_id}, user={user}, bid_amount={bid_amount}")  # Debug print
+
+
+
+def schedule_auction_end(auction_id):
+    auction = db.Auctions.find_one({'_id': ObjectId(auction_id)})
+    if not auction:
+        print(f"Auction {auction_id} not found")
+        return
+
+    end_time = auction['end_time']
+    now = datetime.datetime.utcnow()
+    time_left = (end_time - now).total_seconds()
+
+    if time_left > 0:
+        threading.Timer(time_left, end_auction, [str(auction_id)]).start()
+    else:
+        end_auction(str(auction_id))
+
+def end_auction(auction_id):
+    auction = db.Auctions.find_one({'_id': ObjectId(auction_id)})
+    if not auction or auction['status'] != 'active':
+        return
+
+    db.Auctions.update_one(
+        {'_id': ObjectId(auction_id)},
+        {'$set': {'status': 'ended'}}
+    )
+
+    if auction['highest_bidder']:
+        winner = auction['highest_bidder']
+        winning_bid = auction['current_bid']
+        
+        # Update user balance and assign deed
+        db.Users.update_one(
+            {'name': winner},
+            {'$inc': {'balance': -winning_bid}}
+        )
+        db.Deeds.update_one(
+            {'_id': ObjectId(auction['deed_id'])},
+            {'$set': {'owner': winner}}
+        )
+        
+        end_data = {
+            'auction_id': str(auction_id),
+            'deed_name': auction['deed_name'],
+            'winner': winner,
+            'winning_bid': winning_bid
+        }
+    else:
+        end_data = {
+            'auction_id': str(auction_id),
+            'deed_name': auction['deed_name'],
+            'message': 'No bids were placed'
+        }
+
+    socketio.emit('auction_ended', end_data, room=auction_id)
+    print(f"Auction ended: {end_data}")
+
+
+
+
+
 if __name__ == '__main__':
     try:
-        app.run(host='0.0.0.0', port=5000 , debug=True)
+       socketio.run(app, host='0.0.0.0', port=5000 , debug=True)
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
