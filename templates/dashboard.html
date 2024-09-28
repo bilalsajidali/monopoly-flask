@@ -40,11 +40,11 @@
 
         function formatGold(value) {
             if (value >= 1e6) {
-                return (value / 1e6).toFixed(3) + ' ton';
+                return (value / 1e6).toFixed(1) + ' ton';
             } else if (value >= 1e3) {
-                return (value / 1e3).toFixed(3) + ' kg';
+                return (value / 1e3).toFixed(1) + ' kg';
             } else {
-                return value.toFixed(3) + ' g';
+                return value.toFixed(1) + ' g';
             }
         }
 
@@ -126,16 +126,53 @@
             </div>
         </div>
 
+        <!-- Player Properties with Auction Button -->
         <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-lg rounded-xl p-8 shadow-2xl mb-12">
             <h2 class="text-3xl font-bold text-monopoly-blue mb-4">Your Properties</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {% for deed in deeds %}
-                <div class="bg-{{ deed.color }}-100 rounded-xl p-4 shadow-md">
+                <div class="bg-{{ deed.color }}-100 rounded-xl p-4 shadow-md relative">
                     <h3 class="text-xl font-bold mb-2">{{ deed.name }}</h3>
                     <p class="text-gray-600">Current Value: PKR {{ deed.price | round | int }}</p>
                     <p class="text-gray-600">Current Rent: PKR {{ deed.rent | round | int }}</p>
+                    <button onclick="openAuctionModal('{{ deed._id }}', '{{ deed.name }}', '{{ deed.price }}')"
+                        class="absolute top-2 right-2 bg-monopoly-yellow text-monopoly-blue p-2 rounded-full hover:bg-yellow-400 transition-colors duration-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </button>
                 </div>
                 {% endfor %}
+            </div>
+        </div>
+
+        <!-- Auction Creation Modal -->
+        <div id="auction-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="absolute top-0 right-0 mt-4 mr-4">
+                    <button onclick="closeAuctionModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title"></h3>
+                    <div class="mt-2 px-7 py-3">
+                        <input type="number" id="auction-price" class="w-full px-3 py-2 border rounded-md"
+                            placeholder="Starting bid (PKR)">
+                    </div>
+                    <div class="items-center px-4 py-3">
+                        <button id="create-auction"
+                            class="px-4 py-2 bg-monopoly-blue text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                            Create Auction
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -186,74 +223,123 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script>
-        const socket = io();
-        const user = "{{ user['name'] }}";
-        let activeAuctions = {};
+        let socket;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            socket = io();
+
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                socket.emit('get_active_auctions');
+            });
+            const user = "{{ user['name'] }}";
+            console.log("user", user)
+            let currentDeedId = null;
+
+            socket.on('active_auctions', (auctions) => {
+                console.log('Received auctions:', auctions);
+                activeAuctions = {};
+                auctions.forEach(auction => {
+                    activeAuctions[auction._id] = auction;
+                });
+                updateAuctionUI();
+            });
+
+            socket.on('auction_created', (data) => {
+                console.log('Auction created:', data);
+                if (data.success) {
+                    activeAuctions[data.auction._id] = data.auction;
+                    alert('Auction created successfully!');
+                    updateAuctionUI();
+                } else {
+                    alert('Failed to create auction: ' + data.message);
+                }
+            });
+
+            socket.on('auction_update', (auction) => {
+                console.log('Received auction update:', auction);
+                activeAuctions[auction._id] = auction;
+                updateAuctionUI();
+            });
+
+
+            socket.on('bid_placed', (data) => {
+                console.log('Bid placed successfully:', data);
+                alert(`Your bid of PKR ${data.new_bid} has been placed successfully!`);
+                // The UI will be updated by the 'auction_update' event
+            });
+
+
+            socket.on('bid_error', (data) => {
+                console.error('Bid error:', data);
+                alert('Failed to place bid: ' + data.message);
+            });
+
+            socket.on('auction_ended', (data) => {
+                console.log('Auction ended:', data);
+                delete activeAuctions[data.auction_id];
+                updateAuctionUI();
+                if (data.winner) {
+                    alert(`Auction for ${data.deed_name} ended. Winner: ${data.winner}, Winning Bid: PKR ${data.winning_bid}`);
+                } else {
+                    alert(`Auction for ${data.deed_name} ended. ${data.message}`);
+                }
+            });
+        });
 
         function updateAuctionUI() {
+            const user = "{{ user['name'] }}";  // Get the current user's name
             const auctionsContainer = document.getElementById('active-auctions');
             const loadingMessage = document.getElementById('loading-message');
 
-            if (Object.keys(activeAuctions).length === 0) {
+            // Debugging to ensure `activeAuctions` is defined
+            console.log("Active Auctions:", activeAuctions);
+
+            // Check if there are any active auctions
+            if (!activeAuctions || Object.keys(activeAuctions).length === 0) {
                 loadingMessage.textContent = 'No active auctions at the moment.';
+                loadingMessage.style.display = 'block';  // Ensure the loading message is visible
+                auctionsContainer.innerHTML = '';  // Clear previous auction cards if any
                 return;
             }
 
+            // Hide the loading message if there are auctions
             loadingMessage.style.display = 'none';
-            auctionsContainer.innerHTML = '';
+            auctionsContainer.innerHTML = '';  // Clear the container to render fresh auction cards
 
+            // Loop through active auctions and create cards
             for (const [auctionId, auction] of Object.entries(activeAuctions)) {
                 const auctionCard = document.createElement('div');
                 auctionCard.className = 'bg-white rounded-xl p-6 shadow-xl';
-                auctionCard.innerHTML = `
-                    <h3 class="text-xl font-bold mb-2">${auction.deed_name}</h3>
-                    <p class="text-gray-600">Current Bid: PKR ${auction.current_bid}</p>
-                    <p class="text-gray-600">Highest Bidder: ${auction.highest_bidder || 'None'}</p>
-                    <p class="text-gray-600">Time Left: <span id="timer-${auctionId}"></span></p>
-                    <input type="number" id="bid-input-${auctionId}" class="mt-2 p-2 border rounded" placeholder="Your bid">
-                    <button onclick="placeBid('${auctionId}')" class="mt-2 px-4 py-2 bg-monopoly-blue text-white rounded">Place Bid</button>
-                `;
-                auctionsContainer.appendChild(auctionCard);
 
-                // Start the timer for this auction
-                startTimer(auctionId, new Date(auction.end_time));
-            }
-        }
-
-        function startTimer(auctionId, endTime) {
-            const timerElement = document.getElementById(`timer-${auctionId}`);
-
-            function updateTimer() {
-                const now = new Date();
-                const timeLeft = endTime - now;
-
-                if (timeLeft > 0) {
-                    const minutes = Math.floor(timeLeft / 60000);
-                    const seconds = Math.floor((timeLeft % 60000) / 1000);
-                    timerElement.textContent = `${minutes}m ${seconds}s`;
-                    setTimeout(updateTimer, 1000);
+                // Check if the current user is the auction creator
+                if (auction.creator === user) {
+                    auctionCard.innerHTML = `
+                <h3 class="text-xl font-bold mb-2">${auction.deed_name}</h3>
+                <p class="text-gray-600">Deed Current Rent: ${auction.deed_rent || 'None'}</p>
+                <p class="text-gray-600">Current Bid: PKR ${auction.current_bid}</p>
+                <p class="text-gray-600">Highest Bidder: ${auction.highest_bidder || 'None'}</p>
+                <button onclick="sellDeed('${auctionId}')" class="mt-2 px-4 py-2 bg-green-500 text-white rounded">Sold</button>
+                <button onclick="cancelAuction('${auctionId}')" class="mt-2 px-4 py-2 bg-red-500 text-white rounded">Cancel</button>
+            `;
                 } else {
-                    timerElement.textContent = 'Auction Ended';
-                    document.getElementById(`place-bid-btn-${auctionId}`).style.display = 'none'; // Remove the "Place Bid" button
-
+                    auctionCard.innerHTML = `
+                <h3 class="text-xl font-bold mb-2">${auction.deed_name}</h3>
+                <p class="text-gray-600">Deed Current Rent: ${auction.deed_rent || 'None'}</p>
+                <p class="text-gray-600">Current Bid: PKR ${auction.current_bid}</p>
+                <p class="text-gray-600">Highest Bidder: ${auction.highest_bidder || 'None'}</p>
+                <input type="number" id="bid-input-${auctionId}" class="mt-2 p-2 border rounded" placeholder="Your bid">
+                <button onclick="placeBid('${auctionId}')" class="mt-2 px-4 py-2 bg-monopoly-blue text-white rounded">Place Bid</button>
+            `;
                 }
-            }
 
-            updateTimer();
+                // Append the auction card to the container
+                auctionsContainer.appendChild(auctionCard);
+            }
         }
-
-        socket.on('auction_ended', (data) => {
-            console.log('Auction ended:', data);
-            delete activeAuctions[data.auction_id];
-            updateAuctionUI();
-            if (data.winner) {
-                alert(`Auction for ${data.deed_name} ended. Winner: ${data.winner}, Winning Bid: PKR ${data.winning_bid}`);
-            } else {
-                alert(`Auction for ${data.deed_name} ended. ${data.message}`);
-            }
-        });
 
         function placeBid(auctionId) {
+            const user = "{{ user['name'] }}";
             const bidInput = document.getElementById(`bid-input-${auctionId}`);
             const bidAmount = parseFloat(bidInput.value);
 
@@ -261,6 +347,7 @@
                 alert('Please enter a valid bid higher than the current bid.');
                 return;
             }
+
             console.log('Placing bid:', { auctionId, user, bidAmount });
             socket.emit('place_bid', {
                 auction_id: auctionId,
@@ -270,75 +357,98 @@
             bidInput.value = '';
         }
 
-        socket.on('connect', () => {
-            console.log('Connected to server');
-            socket.emit('get_active_auctions');
-        });
-
-        socket.on('active_auctions', (auctions) => {
-            console.log('Received auctions:', auctions);
-            if (Array.isArray(auctions)) {
-                activeAuctions = auctions.reduce((acc, auction) => {
-                    // Parse end_time back to a Date object
-                    if (auction.end_time) {
-                        auction.end_time = new Date(auction.end_time);
+        function sellDeed(auctionId) {
+            // Call backend to mark the deed as sold and transfer ownership
+            fetch(`/sell_auction/${auctionId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Deed sold successfully!');
+                        // Optionally refresh the auction UI
+                        updateAuctionUI();
+                    } else {
+                        alert('Error selling the deed.');
                     }
-                    acc[auction._id] = auction;
-                    return acc;
-                }, {});
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function cancelAuction(auctionId) {
+            // Call backend to cancel the auction
+            fetch(`/cancel_auction/${auctionId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Auction canceled successfully!');
+                        // Optionally refresh the auction UI
+                        updateAuctionUI();
+                    } else {
+                        alert('Error canceling the auction.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+
+
+
+        function createAuction(deedId, startingBid) {
+            const user = "{{ user['name'] }}";
+            console.log(user, "before create auction")
+            console.log('Creating auction:', { deedId, startingBid, user });
+            socket.emit('create_auction', {
+                deed_id: deedId,
+                starting_bid: startingBid,
+                user: user
+            });
+        }
+
+        // Modify the openAuctionModal function
+        function openAuctionModal(deedId, deedName, deedPrice) {
+            currentDeedId = deedId;
+            const modal = document.getElementById('auction-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const auctionPriceInput = document.getElementById('auction-price');
+
+            modalTitle.textContent = `Create Auction for ${deedName}`;
+            auctionPriceInput.value = deedPrice;
+            auctionPriceInput.min = Math.floor(deedPrice * 0.5);  // Set minimum bid to 50% of the deed price
+            modal.classList.remove('hidden');
+        }
+
+        // Modify the create auction button event listener
+        document.getElementById('create-auction').addEventListener('click', function () {
+            const startingBid = document.getElementById('auction-price').value;
+            if (startingBid && currentDeedId) {
+                createAuction(currentDeedId, parseFloat(startingBid));
+                closeAuctionModal();
             } else {
-                console.error('Received non-array auctions:', auctions);
-            }
-            updateAuctionUI();
-        });
-
-        socket.on('auction_update', (auction) => {
-            console.log('Received auction update:', auction);
-
-            // Update only the specific auction that changed
-            const auctionCard = document.getElementById(`auction-card-${auction._id}`);
-            if (auctionCard) {
-                const currentBidElement = auctionCard.querySelector('.current-bid');
-                const highestBidderElement = auctionCard.querySelector('.highest-bidder');
-
-                currentBidElement.textContent = `Current Bid: PKR ${auction.current_bid}`;
-                highestBidderElement.textContent = `Highest Bidder: ${auction.highest_bidder || 'None'}`;
-            } else {
-                // If the auction card doesn't exist (e.g., new auction), update the whole UI
-                activeAuctions[auction._id] = auction;
-                updateAuctionUI();
-            }
-        });
-
-        socket.on('auction_ended', (data) => {
-            console.log('Auction ended:', data);
-            delete activeAuctions[data.auction_id];
-            updateAuctionUI();
-            if (data.winner) {
-                alert(`Auction for ${data.deed_name} ended. Winner: ${data.winner}, Winning Bid: PKR ${data.winning_bid}`);
-            } else {
-                alert(`Auction for ${data.deed_name} ended. ${data.message}`);
+                alert('Please enter a valid starting bid.');
             }
         });
 
 
-        socket.on('bid_placed', (data) => {
-            console.log('Bid placed successfully:', data);
-            // Update the UI to reflect the new bid
-            if (activeAuctions[data.auction_id]) {
-                activeAuctions[data.auction_id].current_bid = data.new_bid;
-                activeAuctions[data.auction_id].highest_bidder = data.bidder;
-                updateAuctionUI();
-            }
-        });
+        function closeAuctionModal() {
+            const modal = document.getElementById('auction-modal');
+            modal.classList.add('hidden');
+            currentDeedId = null;
+        }
 
-        socket.on('bid_error', (data) => {
-            console.error('Bid error:', data);
-            alert(data.message);
-        });
 
-        // Initial fetch of active auctions
-        socket.emit('get_active_auctions');
     </script>
 </body>
 

@@ -105,48 +105,6 @@
                 });
         }
 
-        function createAuction() {
-            const deedId = document.getElementById('deed-select').value;
-            const startingBid = document.getElementById('starting-bid').value;
-            const increment = document.getElementById('bid-increment').value;
-            const duration = document.getElementById('auction-duration').value;
-
-            if (!deedId || !startingBid || !increment || !duration) {
-                showFlashMessage('All fields are required for creating an auction.', 'error');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('deed_id', deedId);
-            formData.append('starting_bid', startingBid);
-            formData.append('increment', increment);
-            formData.append('duration', duration);
-
-            fetch('/create_auction', {
-                method: 'POST',
-                body: formData
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showFlashMessage('Auction created successfully!', 'success');
-
-                        // Clear fields after auction creation
-                        document.getElementById('deed-select').value = '';
-                        document.getElementById('starting-bid').value = '';
-                        document.getElementById('bid-increment').value = '';
-                        document.getElementById('auction-duration').value = '';
-
-                    } else {
-                        showFlashMessage('Failed to create auction: ' + data.message, 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showFlashMessage('An error occurred while creating the auction.', 'error');
-                });
-        }
-
         function showFlashMessage(message, type) {
             const flashMessages = document.getElementById('flash-messages');
             flashMessages.innerHTML = `
@@ -196,9 +154,9 @@
             </div>
         </div>
 
-        <!-- Deed Assignment and Auction Creation -->
+        <!-- Deed Assignment -->
         <div class="bg-white bg-opacity-90 rounded-xl shadow-2xl p-8 mb-8">
-            <h2 class="text-2xl font-semibold text-monopoly-blue mb-4">Deed Management</h2>
+            <h2 class="text-2xl font-semibold text-monopoly-blue mb-4">Deed Assignment</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <select id="deed-select"
                     class="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-monopoly-blue focus:border-monopoly-blue">
@@ -214,22 +172,10 @@
                     <option value="{{ user._id }}">{{ user.name }}</option>
                     {% endfor %}
                 </select>
-                <input type="number" id="starting-bid" placeholder="Starting Bid"
-                    class="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-monopoly-blue focus:border-monopoly-blue">
-                <input type="number" id="bid-increment" placeholder="Bid Increment"
-                    class="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-monopoly-blue focus:border-monopoly-blue">
-                <input type="number" id="auction-duration" placeholder="Duration (seconds)"
-                    class="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-monopoly-blue focus:border-monopoly-blue">
-                <div class="flex gap-2">
-                    <button onclick="assignDeed()"
-                        class="flex-1 px-4 py-2 bg-monopoly-green text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors duration-300">
-                        Assign Deed
-                    </button>
-                    <button onclick="createAuction()"
-                        class="flex-1 px-4 py-2 bg-monopoly-blue text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-300">
-                        Create Auction
-                    </button>
-                </div>
+                <button onclick="assignDeed()"
+                    class="px-4 py-2 bg-monopoly-green text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors duration-300">
+                    Assign Deed
+                </button>
             </div>
         </div>
 

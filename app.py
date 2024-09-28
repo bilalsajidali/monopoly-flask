@@ -13,6 +13,9 @@ import os
 import datetime
 import pytz
 import json
+from bson.json_util import dumps
+
+
 
 
 # Load environment variables from .env file
@@ -588,23 +591,45 @@ def create_deed():
 
         # Define base prices for the deeds
         deeds_data = [
-            {"name": "Deed 1", "color": "Red", "baseprice": 200},
-            {"name": "Deed 2", "color": "Blue", "baseprice": 300},
-            {"name": "Deed 3", "color": "Green", "baseprice": 400},
-            {"name": "Deed 4", "color": "Yellow", "baseprice": 500},
-            {"name": "Deed 5", "color": "Purple", "baseprice": 600},
-            {"name": "Deed 6", "color": "Orange", "baseprice": 700}
+            {"name": "Mediter-Ranean Avenue", "color": "Brown", "baseprice": 60},
+            {"name": "Baltic Avenue", "color": "Brown", "baseprice": 60},
+            {"name": "Reading RailRoad", "color": "black", "baseprice": 200},
+            {"name": "Oriental Avenue", "color": "sky-blue", "baseprice": 100},
+            {"name": "Vermont Avenue", "color": "sky-blue", "baseprice": 100},
+            {"name": "Connecticut Avenue", "color": "sky-blue", "baseprice": 120},
+            {"name": "ST. Charles Place", "color": "Pink", "baseprice": 140},
+            {"name": "States Avenue", "color": "Pink", "baseprice": 140},
+            {"name": "Virginia  Avenue", "color": "Pink", "baseprice": 160},
+            {"name": "Pennsylvania RailRoad", "color": "Black", "baseprice": 200},
+            {"name": "ST. James Place", "color": "Orange", "baseprice": 180},
+            {"name": "Tennessee Avenue", "color": "Orange", "baseprice": 180},
+            {"name": "NewYork Avenue", "color": "Orange", "baseprice": 200},
+            {"name": "Kentucky Avenue", "color": "Red", "baseprice": 220},
+            {"name": "Indiana Avenue", "color": "Red", "baseprice": 220},
+            {"name": "Illinois Avenue", "color": "Red", "baseprice": 240},
+            {"name": "Atlantic Avenue", "color": "Yellow", "baseprice": 260},
+            {"name": "Ventnor Avenue", "color": "Yellow", "baseprice": 260},
+            {"name": "Marvin Gardens Avenue", "color": "Yellow", "baseprice": 280},
+            {"name": "Pacific Avenue", "color": "Green", "baseprice": 300},
+            {"name": "North Carolina Avenue", "color": "Green", "baseprice": 300},
+            {"name": "Pennsylvania Avenue", "color": "Green", "baseprice": 320},
+            {"name": "Short Line RailwayRoad", "color": "Black", "baseprice": 200},
+            {"name": "Papk Place", "color": "Purple", "baseprice": 350},
+            {"name": "BoardWalk", "color": "Purple", "baseprice": 400},
+            {"name": "B&O RailRoad", "color": "black", "baseprice": 200}
         ]
 
         # Calculate price and rent dynamically based on the goldrate
         deeds = []
         for deed in deeds_data:
+            baseprice=deed['baseprice']
             price = deed['baseprice'] * goldrate
             rent = price / 2
             deeds.append({
                 "name": deed["name"],
                 "color": deed["color"],
-                "price": price,
+                "baseprice": baseprice,
+                "price":price,
                 "rent": rent
             })
 
@@ -649,6 +674,24 @@ def update_gold_rate():
     request_data = {'rate': new_rate}
     with app.test_request_context(json=request_data):  # Simulate a request context
         response = set_gold_rate()
+        update_deeds_prices(new_rate)
+
+def update_deeds_prices(goldrate):
+    # Fetch all deeds from the Deeds collection
+    deeds = db.Deeds.find()
+    
+    # Update each deed's price and rent based on the new gold rate
+    for deed in deeds:
+        base_price = deed['baseprice'] / (goldrate / (goldrate + 500))  # Reverse calculation to get base price
+        new_price = base_price * goldrate
+        new_rent = new_price / 2
+        
+        db.Deeds.update_one(
+            {'_id': deed['_id']},
+            {'$set': {'price': new_price, 'rent': new_rent}}
+        )
+
+
 
 # Existing function to manually set the gold rate
 @app.route('/set-gold-rate', methods=['POST'])
@@ -702,8 +745,6 @@ def delete_all_bank_requests():
 
 #auction system
 
-
-# Auction data structure
 auctions = {}
 @app.route('/create_auction', methods=['POST'])
 def create_auction():
@@ -711,16 +752,14 @@ def create_auction():
         deed_id = request.form.get('deed_id')
         starting_bid = request.form.get('starting_bid')
         increment = request.form.get('increment')
-        duration = request.form.get('duration')
 
         # Validate input
-        if not all([deed_id, starting_bid, increment, duration]):
+        if not all([deed_id, starting_bid, increment]):
             return jsonify({'success': False, 'message': 'All fields are required.'})
 
         try:
             starting_bid = float(starting_bid)
             increment = float(increment)
-            duration = int(duration)
         except ValueError:
             return jsonify({'success': False, 'message': 'Invalid numeric values provided.'})
 
@@ -742,13 +781,9 @@ def create_auction():
             'highest_bidder': None,
             'participants': [],
             'status': 'active',
-            'end_time': datetime.datetime.now() + datetime.timedelta(seconds=duration)
         }
         result = db.Auctions.insert_one(auction)
         auction_id = str(result.inserted_id)
-        schedule_auction_end(auction_id)
-        # Schedule auction end
-        threading.Timer(duration, end_auction, [auction_id]).start()
 
         return jsonify({'success': True, 'auction_id': auction_id})
 
@@ -756,15 +791,69 @@ def create_auction():
         app.logger.error(f"Error in create_auction: {str(e)}")
         return jsonify({'success': False, 'message': 'An error occurred while creating the auction.'})
 
-@app.route('/get_active_auctions')
-def get_active_auctions():
+
+
+@socketio.on('create_auction')
+def handle_create_auction(data):
+    try:
+        deed_id = data['deed_id']
+        starting_bid = float(data['starting_bid'])
+        user = data['user']
+
+        if not all([deed_id, starting_bid, user]):
+            return emit('auction_created', {'success': False, 'message': 'All fields are required.'})
+
+        deed = db.Deeds.find_one({'_id': ObjectId(deed_id)})
+        if not deed:
+            return emit('auction_created', {'success': False, 'message': 'Deed not found.'})
+
+        auction = {
+            '_id': ObjectId(),
+            'deed_id': ObjectId(deed_id),
+            'creator': user,
+            'deed_name': deed['name'],
+            'deed_color': deed['color'],
+            'deed_price': deed['price'],
+            'deed_rent': deed['rent'],
+            'starting_bid': starting_bid,
+            'current_bid': starting_bid,
+            'increment': starting_bid * 0.1,
+            'highest_bidder': None,
+            'participants': [],
+            'status': 'active',
+        }
+        
+        result = db.Auctions.insert_one(auction)
+        auction_id = str(result.inserted_id)
+
+        serializable_auction = json.loads(json_util.dumps(auction))
+        serializable_auction['_id'] = str(serializable_auction['_id'])
+        serializable_auction['deed_id'] = str(serializable_auction['deed_id'])
+
+        emit('auction_created', {
+            'success': True,
+            'auction_id': auction_id,
+            'auction': serializable_auction
+        }, broadcast=True)
+
+    except Exception as e:
+        app.logger.error(f"Error in create_auction: {str(e)}")
+        emit('auction_created', {'success': False, 'message': f'An error occurred while creating the auction: {str(e)}'})
+
+
+
+
+@socketio.on('get_active_auctions')
+def handle_get_active_auctions():
     active_auctions = list(db.Auctions.find({'status': 'active'}))
-    app.logger.info(f"Fetched {len(active_auctions)} active auctions")
-    app.logger.debug(f"Auctions: {active_auctions}")
     for auction in active_auctions:
         auction['_id'] = str(auction['_id'])
         auction['deed_id'] = str(auction['deed_id'])
-    return jsonify(active_auctions)
+    
+    active_auctions_json = json.loads(dumps(active_auctions))
+    emit('active_auctions', active_auctions_json)
+
+
 
 @socketio.on('join_auction')
 def on_join_auction(data):
@@ -790,20 +879,7 @@ def on_leave_auction(data):
         emit('auction_update', auctions[auction_id], room=auction_id)
 
 
-@socketio.on('get_active_auctions')
-def handle_get_active_auctions():
-    active_auctions = list(db.Auctions.find({'status': 'active'}))
-    for auction in active_auctions:
-        schedule_auction_end(auction['_id'])
-        auction['_id'] = str(auction['_id'])
-        auction['deed_id'] = str(auction['deed_id'])
-        # Convert datetime to string
-        if 'end_time' in auction:
-            auction['end_time'] = auction['end_time'].isoformat()
-    
-    # Use json_util to handle MongoDB-specific types
-    active_auctions_json = json.loads(json_util.dumps(active_auctions))
-    emit('active_auctions', active_auctions_json)
+
 
 @socketio.on('place_bid')
 def on_place_bid(data):
@@ -843,7 +919,7 @@ def on_place_bid(data):
         if 'end_time' in updated_auction:
             updated_auction['end_time'] = updated_auction['end_time'].isoformat()
         
-        socketio.emit('auction_update', updated_auction, room=auction_id)
+        socketio.emit('auction_update', updated_auction, to="broadcast")
         
         # Emit success to the bidder
         emit('bid_placed', {
@@ -854,22 +930,6 @@ def on_place_bid(data):
 
         print(f"Bid placed successfully: auction_id={auction_id}, user={user}, bid_amount={bid_amount}")  # Debug print
 
-
-
-def schedule_auction_end(auction_id):
-    auction = db.Auctions.find_one({'_id': ObjectId(auction_id)})
-    if not auction:
-        print(f"Auction {auction_id} not found")
-        return
-
-    end_time = auction['end_time']
-    now = datetime.datetime.utcnow()
-    time_left = (end_time - now).total_seconds()
-
-    if time_left > 0:
-        threading.Timer(time_left, end_auction, [str(auction_id)]).start()
-    else:
-        end_auction(str(auction_id))
 
 def end_auction(auction_id):
     auction = db.Auctions.find_one({'_id': ObjectId(auction_id)})
@@ -908,10 +968,60 @@ def end_auction(auction_id):
             'message': 'No bids were placed'
         }
 
-    socketio.emit('auction_ended', end_data, room=auction_id)
+    socketio.emit('auction_ended', end_data, broadcast=True)
     print(f"Auction ended: {end_data}")
 
+#cancel and sold auction
 
+@app.route('/cancel_auction/<auction_id>', methods=['POST'])
+def cancel_auction(auction_id):
+    try:
+        # Find the auction in the database
+        auction = db.Auctions.find_one({'_id': ObjectId(auction_id), 'status': 'active'})
+        if not auction:
+            return jsonify({'success': False, 'message': 'Auction not found or already completed.'})
+
+        # Mark the auction as canceled
+        db.Auctions.update_one({'_id': ObjectId(auction_id)}, {'$set': {'status': 'canceled'}})
+
+        # Broadcast the cancellation
+        socketio.emit('auction_canceled', {'auction_id': auction_id}, to="broadcast")
+        
+        return jsonify({'success': True, 'message': 'Auction canceled successfully.'})
+    except Exception as e:
+        app.logger.error(f"Error in cancel_auction: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while canceling the auction.'})
+
+
+@app.route('/sell_auction/<auction_id>', methods=['POST'])
+def sell_auction(auction_id):
+    try:
+        auction = db.Auctions.find_one({'_id': ObjectId(auction_id), 'status': 'active'})
+        if not auction:
+            return jsonify({'success': False, 'message': 'Auction not found or already completed.'})
+
+        if not auction['highest_bidder']:
+            return jsonify({'success': False, 'message': 'No bids placed on this auction.'})
+
+        highest_bidder = auction['highest_bidder']
+        bid_amount = auction['current_bid']
+        deed_id = auction['deed_id']
+
+        # Update deed ownership and deduct amount from the highest bidder
+        db.Users.update_one({'name': highest_bidder}, {'$inc': {'balance': -bid_amount}})
+        db.Users.update_one({'name': auction['creator']}, {'$inc': {'balance': bid_amount}})
+        db.Deeds.update_one({'_id': ObjectId(deed_id)}, {'$set': {'owner': highest_bidder}})
+
+        # Mark the auction as completed
+        db.Auctions.update_one({'_id': ObjectId(auction_id)}, {'$set': {'status': 'completed'}})
+
+        # Broadcast the auction as sold
+        socketio.emit('auction_sold', {'auction_id': auction_id, 'highest_bidder': highest_bidder, 'bid_amount': bid_amount}, to="broadcast")
+
+        return jsonify({'success': True, 'message': 'Auction sold successfully.'})
+    except Exception as e:
+        app.logger.error(f"Error in sell_auction: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while selling the auction.'})
 
 
 
