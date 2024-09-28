@@ -249,8 +249,8 @@
                 console.log('Auction created:', data);
                 if (data.success) {
                     activeAuctions[data.auction._id] = data.auction;
-                    alert('Auction created successfully!');
-                    updateAuctionUI();
+                    alert(`1 new Auction created ${data.auction.deed_name} !`);
+                    //updateAuctionUI();
                 } else {
                     alert('Failed to create auction: ' + data.message);
                 }
