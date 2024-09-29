@@ -594,8 +594,8 @@ def create_deed():
             {"name": "Mediter-Ranean Avenue", "color": "Brown", "baseprice": 60},
             {"name": "Baltic Avenue", "color": "Brown", "baseprice": 60},
             {"name": "Reading RailRoad", "color": "black", "baseprice": 200},
-            {"name": "Oriental Avenue", "color": "sky-blue", "baseprice": 100},
-            {"name": "Vermont Avenue", "color": "sky-blue", "baseprice": 100},
+            {"name": "Oriental Avenue", "color": "skyblue", "baseprice": 100},
+            {"name": "Vermont Avenue", "color": "skyblue", "baseprice": 100},
             {"name": "Connecticut Avenue", "color": "sky-blue", "baseprice": 120},
             {"name": "ST. Charles Place", "color": "Pink", "baseprice": 140},
             {"name": "States Avenue", "color": "Pink", "baseprice": 140},
@@ -614,8 +614,8 @@ def create_deed():
             {"name": "North Carolina Avenue", "color": "Green", "baseprice": 300},
             {"name": "Pennsylvania Avenue", "color": "Green", "baseprice": 320},
             {"name": "Short Line RailwayRoad", "color": "Black", "baseprice": 200},
-            {"name": "Papk Place", "color": "Purple", "baseprice": 350},
-            {"name": "BoardWalk", "color": "Purple", "baseprice": 400},
+            {"name": "Papk Place", "color": "Blue", "baseprice": 350},
+            {"name": "BoardWalk", "color": "Blue", "baseprice": 400},
             {"name": "B&O RailRoad", "color": "black", "baseprice": 200}
         ]
 

@@ -131,10 +131,11 @@
             <h2 class="text-3xl font-bold text-monopoly-blue mb-4">Your Properties</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {% for deed in deeds %}
-                <div class="bg-{{ deed.color }}-100 rounded-xl p-4 shadow-md relative">
+                <div class="rounded-xl p-4 shadow-md relative text-white" style="background-color: {{ deed.color }};">
                     <h3 class="text-xl font-bold mb-2">{{ deed.name }}</h3>
-                    <p class="text-gray-600">Current Value: PKR {{ deed.price | round | int }}</p>
-                    <p class="text-gray-600">Current Rent: PKR {{ deed.rent | round | int }}</p>
+                    <p class="">Current Value: PKR {{ deed.price | round | int }}</p>
+                    <p class="">Current Rent: PKR {{ deed.rent | round | int }}</p>
+                    <p class="">Deed Color: {{ deed.color}}</p>
                     <button onclick="openAuctionModal('{{ deed._id }}', '{{ deed.name }}', '{{ deed.price }}')"
                         class="absolute top-2 right-2 bg-monopoly-yellow text-monopoly-blue p-2 rounded-full hover:bg-yellow-400 transition-colors duration-300">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -316,8 +317,9 @@
                 if (auction.creator === user) {
                     auctionCard.innerHTML = `
                 <h3 class="text-xl font-bold mb-2">${auction.deed_name}</h3>
+                <p class="text-gray-600">Deed Color: ${auction.deed_color}</p>
+                <p class="text-gray-600">Current Bid: ${auction.current_bid}</p>
                 <p class="text-gray-600">Deed Current Rent: ${auction.deed_rent || 'None'}</p>
-                <p class="text-gray-600">Current Bid: PKR ${auction.current_bid}</p>
                 <p class="text-gray-600">Highest Bidder: ${auction.highest_bidder || 'None'}</p>
                 <button onclick="sellDeed('${auctionId}')" class="mt-2 px-4 py-2 bg-green-500 text-white rounded">Sold</button>
                 <button onclick="cancelAuction('${auctionId}')" class="mt-2 px-4 py-2 bg-red-500 text-white rounded">Cancel</button>
