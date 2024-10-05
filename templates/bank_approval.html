@@ -162,7 +162,7 @@
                     class="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-monopoly-blue focus:border-monopoly-blue">
                     <option value="">Select a deed</option>
                     {% for deed in deeds %}
-                    <option value="{{ deed._id }}">{{ deed.name }}</option>
+                    <option value="{{ deed._id }}">{{ deed.name }}---{{deed.price}}---{{deed.color}} </option>
                     {% endfor %}
                 </select>
                 <select id="user-select"

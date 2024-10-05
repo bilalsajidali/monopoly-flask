@@ -35,7 +35,7 @@ db = client[db_name]
 
 GO_AMOUNT = 200000  # Set the amount to be added for GO functionality
 GO_COOLDOWN = timedelta(minutes=3)  # Set the cooldown period
-
+default_goldrate=1500
 socketio = SocketIO(app)
 
 
@@ -45,7 +45,7 @@ socketio = SocketIO(app)
 
 @app.before_request
 def check_login():
-    if 'user' not in session and request.endpoint not in ["create_deed",'get_active_auctions','login', 'play_game', 'static', 'home', 'add_user', "delete_all_users", "set_gold_rate", "update_gold_rate", "delete_all_bank_requests"]:
+    if 'user' not in session and request.endpoint not in ["endGame","delete_all_deeds","create_deed",'get_active_auctions','login', 'play_game', 'static', 'home', 'add_user', "delete_all_users", "set_gold_rate", "update_gold_rate", "delete_all_bank_requests"]:
         return redirect(url_for('login'))
     # elif 'user' in session and 'role' in session:
     #     if session['role'] == 'banker' and request.endpoint not in ['bank_approval', 'logout']:
@@ -91,10 +91,13 @@ def add_user():
 
             # Customize new user based on the name
             if name == 'bilal':
-                new_user['goldrate'] = 1500
+                new_user['goldrate'] = default_goldrate
+                create_deed()
+                
             elif name == 'abdulrehman':
                 new_user['role'] = 'banker'
                 new_user['requests_count'] = 0
+            
 
             # Try to insert the new user, will raise DuplicateKeyError if name already exists
             result = db.Users.insert_one(new_user)
@@ -587,36 +590,39 @@ def create_deed():
     try:
         # Fetch the goldrate from the user 'bilal'
         bilal = db.Users.find_one({'name': 'bilal'})
-        goldrate = bilal.get('goldrate', 1)  # Default goldrate to 1 if not found
+        goldrate = default_goldrate  # Default goldrate to 1 if not found
 
         # Define base prices for the deeds
         deeds_data = [
-            {"name": "Mediter-Ranean Avenue", "color": "Brown", "baseprice": 60},
-            {"name": "Baltic Avenue", "color": "Brown", "baseprice": 60},
+            {"name": "Mediter-Ranean Avenue", "color": "Brown", "baseprice": 30},
+            {"name": "Baltic Avenue", "color": "Brown", "baseprice": 30},
+            {"name": "Oriental Avenue", "color": "skyblue", "baseprice": 50},
+            {"name": "Vermont Avenue", "color": "skyblue", "baseprice": 50},
+            {"name": "Connecticut Avenue", "color": "skyblue", "baseprice": 60},
+            {"name": "ST. Charles Place", "color": "Pink", "baseprice": 70},
+            {"name": "States Avenue", "color": "Pink", "baseprice": 70},
+            {"name": "Virginia  Avenue", "color": "Pink", "baseprice": 80},
+            {"name": "ST. James Place", "color": "Orange", "baseprice": 90},
+            {"name": "Tennessee Avenue", "color": "Orange", "baseprice": 90},
+            {"name": "NewYork Avenue", "color": "Orange", "baseprice": 100},
+            {"name": "Kentucky Avenue", "color": "Red", "baseprice": 110},
+            {"name": "Indiana Avenue", "color": "Red", "baseprice": 110},
+            {"name": "Illinois Avenue", "color": "Red", "baseprice": 120},
+            {"name": "Atlantic Avenue", "color": "Yellow", "baseprice": 130},
+            {"name": "Ventnor Avenue", "color": "Yellow", "baseprice": 130},
+            {"name": "Marvin Gardens Avenue", "color": "Yellow", "baseprice": 140},
+            {"name": "Pacific Avenue", "color": "Green", "baseprice": 150},
+            {"name": "North Carolina Avenue", "color": "Green", "baseprice": 150},
+            {"name": "Pennsylvania Avenue", "color": "Green", "baseprice": 160},
+            {"name": "Papk Place", "color": "Blue", "baseprice": 160},
+            {"name": "BoardWalk", "color": "Blue", "baseprice": 200},
+            {"name": "B&O RailRoad", "color": "black", "baseprice": 200},
             {"name": "Reading RailRoad", "color": "black", "baseprice": 200},
-            {"name": "Oriental Avenue", "color": "skyblue", "baseprice": 100},
-            {"name": "Vermont Avenue", "color": "skyblue", "baseprice": 100},
-            {"name": "Connecticut Avenue", "color": "sky-blue", "baseprice": 120},
-            {"name": "ST. Charles Place", "color": "Pink", "baseprice": 140},
-            {"name": "States Avenue", "color": "Pink", "baseprice": 140},
-            {"name": "Virginia  Avenue", "color": "Pink", "baseprice": 160},
-            {"name": "Pennsylvania RailRoad", "color": "Black", "baseprice": 200},
-            {"name": "ST. James Place", "color": "Orange", "baseprice": 180},
-            {"name": "Tennessee Avenue", "color": "Orange", "baseprice": 180},
-            {"name": "NewYork Avenue", "color": "Orange", "baseprice": 200},
-            {"name": "Kentucky Avenue", "color": "Red", "baseprice": 220},
-            {"name": "Indiana Avenue", "color": "Red", "baseprice": 220},
-            {"name": "Illinois Avenue", "color": "Red", "baseprice": 240},
-            {"name": "Atlantic Avenue", "color": "Yellow", "baseprice": 260},
-            {"name": "Ventnor Avenue", "color": "Yellow", "baseprice": 260},
-            {"name": "Marvin Gardens Avenue", "color": "Yellow", "baseprice": 280},
-            {"name": "Pacific Avenue", "color": "Green", "baseprice": 300},
-            {"name": "North Carolina Avenue", "color": "Green", "baseprice": 300},
-            {"name": "Pennsylvania Avenue", "color": "Green", "baseprice": 320},
             {"name": "Short Line RailwayRoad", "color": "Black", "baseprice": 200},
-            {"name": "Papk Place", "color": "Blue", "baseprice": 350},
-            {"name": "BoardWalk", "color": "Blue", "baseprice": 400},
-            {"name": "B&O RailRoad", "color": "black", "baseprice": 200}
+            {"name": "Pennsylvania RailRoad", "color": "Black", "baseprice": 200},
+
+
+
         ]
 
         # Calculate price and rent dynamically based on the goldrate
@@ -720,6 +726,10 @@ def delete_all_users():
     result = db.Users.delete_many({})
     return jsonify({"message": f"Deleted {result.deleted_count} users from the database"}), 200
 
+@app.route('/delete_all_deeds', methods=['DELETE'])
+def delete_all_deeds():
+    result = db.Deeds.delete_many({})
+    return jsonify({"message": f"Deleted {result.deleted_count} deeds from the database"}), 200
 
 
 @app.route('/delete_all_bank_requests', methods=['DELETE'])
@@ -728,6 +738,16 @@ def delete_all_bank_requests():
     return jsonify({"message": f"Deleted {result.deleted_count} bankrequests from the database"}), 200
 
 
+
+
+
+@app.route('/endGame', methods=['DELETE'])
+def endGame():
+    result1 = db.BankRequests.delete_many({})
+    result2 = db.Users.delete_many({})
+    result3 = db.Deeds.delete_many({})
+    result4 = db.Auctions.delete_many({})
+    return jsonify({"message": f"DB cleared!- GAME ENDS"}), 200
 
 
 
