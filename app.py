@@ -379,46 +379,6 @@ def transfers():
         return "Failed to load users.", 500
 
 
-# @app.route('/banking', methods=['GET', 'POST'])
-# @login_required
-# def banking():
-#     try:
-#         current_user = session['user']
-#         if not current_user:
-#             flash('No current user found.', 'danger')
-#             return redirect(url_for('home'))
-
-#         if request.method == 'POST':
-#             action = request.form.get('action')
-#             amount = float(request.form.get('amount', 0))
-#             user = db.Users.find_one({'name': current_user})
-
-#             if not user:
-#                 flash('User not found.', 'danger')
-#                 return redirect(url_for('banking', user=current_user))
-#             utc_time = datetime.datetime.now(pytz.utc)
-#             # Convert to Pakistan Standard Time (PST)
-#             pst_time = utc_time.astimezone(pytz.timezone('Asia/Karachi'))
-#             formatted_time = pst_time.strftime('%Y-%m-%d %I:%M:%S %p')
-#             # Insert request into a "bank_requests" collection for banker approval
-#             request_id = db.BankRequests.insert_one({
-#                 'user': current_user,
-#                 'action': action,
-#                 'amount': amount,
-#                 'status': 'pending',
-#                 'timestamp': formatted_time
-#             }).inserted_id
-
-#             flash(f'{action.capitalize()} request submitted successfully. Awaiting approval.', 'success')
-#             return redirect(url_for('banking', user=current_user))
-
-#         return render_template('banking.html', current_user=current_user)
-#     except Exception as e:
-#         app.logger.error(f"Error handling banking: {str(e)}")
-#         flash('An error occurred while processing your request.', 'danger')
-#         return redirect(url_for('banking', user=current_user))
-
-
 @app.route('/banking', methods=['GET', 'POST'])
 @login_required
 def banking():
@@ -449,13 +409,14 @@ def banking():
                 userLoan = user.get('loan', 0)
                 userNetWorth = user.get('networth',0)
                 max_loan_limit_official = userNetWorth * 0.3
+                loanInterest = amount * 0.15  # 15% interest
                 max_loan_limit = max_loan_limit_official - userLoan
 
                 # Loan approval criteria
                 if (amount <= max_loan_limit and amount > 0):
                     # Update user's balance and loan
                     new_balance = userBalance + amount
-                    new_loan = userLoan + amount
+                    new_loan = userLoan + amount + loanInterest
                     db.Users.update_one(
                         {'name': current_user}, 
                         {'$set': {
@@ -464,7 +425,7 @@ def banking():
                         }}
                     )
                     
-                    flash(f'Loan of {amount} approved and credited to your account.', 'success')
+                    flash(f'Loan of {amount} with interest {loanInterest} approved and credited to your account.', 'success')
                 else:
                     # Loan denied
                     denial_reasons = []
@@ -795,7 +756,7 @@ def update_gold_rate():
     if random.choices(['increase', 'decrease'], weights=[2, 1])[0] == 'increase':
         new_rate = current_rate + 500
     else:
-        new_rate = max(0, current_rate - 500)  # Ensure the rate doesn't go below 0
+        new_rate = max(500, current_rate - 500)  # Ensure the rate doesn't go below 0
 
     # Use your existing set_gold_rate logic to update the gold rate for user 'Bilal'
     request_data = {'rate': new_rate}
