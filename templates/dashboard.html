@@ -48,6 +48,25 @@
             }
         }
 
+        function fetchNetworth() {
+            const username = "{{ user['name'] }}";
+            fetch(`/networth?user=${encodeURIComponent(username)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.total_net_worth !== undefined) {
+                        const networthElement = document.getElementById('networth');
+                        if (networthElement) {
+                            networthElement.textContent = 'Net Worth: ' + formatNumber(data.total_net_worth);
+                        }
+                    } else {
+                        console.error('Error fetching networth:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching networth:', error);
+                });
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             var balanceElement = document.getElementById('balance');
             if (balanceElement) {
@@ -66,6 +85,9 @@
                 var goldValue = parseFloat(goldElement.dataset.gold);
                 goldElement.textContent = formatGold(goldValue);
             }
+
+            // Fetch networth immediately
+            fetchNetworth();
 
             var flashMessages = document.getElementById('flash-messages');
             if (flashMessages) {
@@ -107,8 +129,30 @@
         </div>
 
         <!-- User Info Card -->
-        <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-lg rounded-xl p-8 shadow-2xl mb-12 ">
+        <!-- <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-lg rounded-xl p-8 shadow-2xl mb-12 ">
             <h2 class="text-3xl font-bold text-monopoly-blue mb-4">Welcome, {{ user['name'] }}!</h2>
+            <p id="networth" class="text-2xl font-bold text-purple-600"></p>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <p class="text-lg font-semibold text-gray-600">Balance</p>
+                    <p id="balance" data-balance="{{ user['balance'] }}" class="text-2xl font-bold text-monopoly-green">
+                    </p>
+                </div>
+                <div>
+                    <p class="text-lg font-semibold text-gray-600">Gold</p>
+                    <p id="gold" data-gold="{{ user['gold'] }}" class="text-2xl font-bold text-yellow-500"></p>
+                </div>
+                <div>
+                    <p class="text-lg font-semibold text-gray-600">Loan</p>
+                    <p id="loan" data-loan="{{ user['loan'] }}" class="text-2xl font-bold text-monopoly-red"></p>
+                </div>
+            </div>
+        </div> -->
+        <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-lg rounded-xl p-8 shadow-2xl mb-12">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-3xl font-bold text-monopoly-blue">Welcome, {{ user['name'] }}!</h2>
+                <p id="networth" class="text-2xl font-bold text-purple-600"></p>
+            </div>
             <div class="grid grid-cols-3 gap-4 text-center">
                 <div>
                     <p class="text-lg font-semibold text-gray-600">Balance</p>
@@ -125,7 +169,6 @@
                 </div>
             </div>
         </div>
-
         <!-- Player Properties with Auction Button -->
         <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-lg rounded-xl p-8 shadow-2xl mb-12">
             <h2 class="text-3xl font-bold text-monopoly-blue mb-4">Your Properties</h2>

@@ -45,7 +45,7 @@ socketio = SocketIO(app)
 
 @app.before_request
 def check_login():
-    if 'user' not in session and request.endpoint not in ["endGame","delete_all_deeds","create_deed",'get_active_auctions','login', 'play_game', 'static', 'home', 'add_user', "delete_all_users", "set_gold_rate", "update_gold_rate", "delete_all_bank_requests"]:
+    if 'user' not in session and request.endpoint not in ["endGame","delete_all_deeds","create_deed",'get_active_auctions','login', 'play_game', 'static', 'home', 'add_user', "delete_all_users", "set_gold_rate", "update_gold_rate", "delete_all_bank_requests","Networth"]:
         return redirect(url_for('login'))
     # elif 'user' in session and 'role' in session:
     #     if session['role'] == 'banker' and request.endpoint not in ['bank_approval', 'logout']:
@@ -379,6 +379,46 @@ def transfers():
         return "Failed to load users.", 500
 
 
+# @app.route('/banking', methods=['GET', 'POST'])
+# @login_required
+# def banking():
+#     try:
+#         current_user = session['user']
+#         if not current_user:
+#             flash('No current user found.', 'danger')
+#             return redirect(url_for('home'))
+
+#         if request.method == 'POST':
+#             action = request.form.get('action')
+#             amount = float(request.form.get('amount', 0))
+#             user = db.Users.find_one({'name': current_user})
+
+#             if not user:
+#                 flash('User not found.', 'danger')
+#                 return redirect(url_for('banking', user=current_user))
+#             utc_time = datetime.datetime.now(pytz.utc)
+#             # Convert to Pakistan Standard Time (PST)
+#             pst_time = utc_time.astimezone(pytz.timezone('Asia/Karachi'))
+#             formatted_time = pst_time.strftime('%Y-%m-%d %I:%M:%S %p')
+#             # Insert request into a "bank_requests" collection for banker approval
+#             request_id = db.BankRequests.insert_one({
+#                 'user': current_user,
+#                 'action': action,
+#                 'amount': amount,
+#                 'status': 'pending',
+#                 'timestamp': formatted_time
+#             }).inserted_id
+
+#             flash(f'{action.capitalize()} request submitted successfully. Awaiting approval.', 'success')
+#             return redirect(url_for('banking', user=current_user))
+
+#         return render_template('banking.html', current_user=current_user)
+#     except Exception as e:
+#         app.logger.error(f"Error handling banking: {str(e)}")
+#         flash('An error occurred while processing your request.', 'danger')
+#         return redirect(url_for('banking', user=current_user))
+
+
 @app.route('/banking', methods=['GET', 'POST'])
 @login_required
 def banking():
@@ -396,23 +436,104 @@ def banking():
             if not user:
                 flash('User not found.', 'danger')
                 return redirect(url_for('banking', user=current_user))
-            utc_time = datetime.datetime.now(pytz.utc)
-            # Convert to Pakistan Standard Time (PST)
-            pst_time = utc_time.astimezone(pytz.timezone('Asia/Karachi'))
-            formatted_time = pst_time.strftime('%Y-%m-%d %I:%M:%S %p')
-            # Insert request into a "bank_requests" collection for banker approval
-            request_id = db.BankRequests.insert_one({
-                'user': current_user,
-                'action': action,
-                'amount': amount,
-                'status': 'pending',
-                'timestamp': formatted_time
-            }).inserted_id
 
-            flash(f'{action.capitalize()} request submitted successfully. Awaiting approval.', 'success')
-            return redirect(url_for('banking', user=current_user))
+            # Automatic loan and loan repayment processing
+            if action == 'loan':
+                # Loan criteria checks
+                if amount <= 0:
+                    flash('Loan amount must be a positive value.', 'danger')
+                    return redirect(url_for('banking', user=current_user))
+
+                # Example loan criteria (you can expand these)
+                userBalance = user.get('balance', 0)
+                userLoan = user.get('loan', 0)
+                userNetWorth = user.get('networth',0)
+                max_loan_limit_official = userNetWorth * 0.3
+                max_loan_limit = max_loan_limit_official - userLoan
+
+                # Loan approval criteria
+                if (amount <= max_loan_limit and amount > 0):
+                    # Update user's balance and loan
+                    new_balance = userBalance + amount
+                    new_loan = userLoan + amount
+                    db.Users.update_one(
+                        {'name': current_user}, 
+                        {'$set': {
+                            'balance': new_balance,
+                            'loan': new_loan,
+                        }}
+                    )
+                    
+                    flash(f'Loan of {amount} approved and credited to your account.', 'success')
+                else:
+                    # Loan denied
+                    denial_reasons = []
+                    if amount > max_loan_limit:
+                        denial_reasons.append(f'Loan exceeds max limit of {max_loan_limit}')
+                    
+                    flash('Loan denied. Reasons: ' + '; '.join(denial_reasons), 'danger')
+                
+                return redirect(url_for('banking', user=current_user))
+
+            elif action == 'loan-repayment':
+                # Loan repayment processing
+                current_loan = user.get('loan', 0)
+                
+                # Validation checks
+                if amount <= 0:
+                    flash('Repayment amount must be a positive value.', 'danger')
+                    return redirect(url_for('banking', user=current_user))
+                
+                if current_loan == 0:
+                    flash('No existing loan to repay.', 'danger')
+                    return redirect(url_for('banking', user=current_user))
+                
+                if amount > user['balance']:
+                    flash('Insufficient balance to repay the loan.', 'danger')
+                    return redirect(url_for('banking', user=current_user))
+                
+                # Calculate new loan and balance
+                new_loan = max(0, current_loan - amount)
+                new_balance = user['balance'] - amount
+                
+                # Update user's balance and loan
+                db.Users.update_one(
+                    {'name': current_user}, 
+                    {'$set': {
+                        'balance': new_balance,
+                        'loan': new_loan
+                    }}
+                )
+                
+                # Check if loan is fully repaid
+                if new_loan == 0:
+                    flash(f'Loan fully repaid. Remaining balance: {new_balance}', 'success')
+                else:
+                    flash(f'Partial loan repayment. Remaining loan: {new_loan}', 'success')
+                
+                return redirect(url_for('banking', user=current_user))
+
+            # For other actions, fall back to previous behavior
+            else:
+                # Insert request into BankRequests for other actions
+                utc_time = datetime.datetime.now(pytz.utc)
+                # Convert to Pakistan Standard Time (PST)
+                pst_time = utc_time.astimezone(pytz.timezone('Asia/Karachi'))
+                formatted_time = pst_time.strftime('%Y-%m-%d %I:%M:%S %p')
+                
+                request_id = db.BankRequests.insert_one({
+                    'user': current_user,
+                    'action': action,
+                    'amount': amount,
+                    'status': 'pending',
+                    'timestamp': formatted_time
+                }).inserted_id
+
+                flash(f'{action.capitalize()} request submitted successfully. Awaiting approval.', 'success')
+                return redirect(url_for('banking', user=current_user))
 
         return render_template('banking.html', current_user=current_user)
+    
     except Exception as e:
         app.logger.error(f"Error handling banking: {str(e)}")
         flash('An error occurred while processing your request.', 'danger')
@@ -752,15 +873,38 @@ def endGame():
 
 
 
+@app.route('/networth', methods=['GET'])
+def Networth():
+    user = request.args.get("user")  # Extract the "user" parameter from query string
+    if not user:
+        return {"error": "User parameter is required"}, 400  # Return an error if user is not provided
 
+    print("user: ", user)
 
+    goldRate_user = db.Users.find_one({"name": "bilal"})
+    if not goldRate_user:
+        return {"error": "Gold rate not found for bilal"}, 404
 
+    goldRate = goldRate_user.get("goldrate")
+    user_data = db.Users.find_one({"name": user})
+    if not user_data:
+        return {"error": f"User {user} not found"}, 404
+    
+    user_deeds = list(db.Deeds.find({"owner": user}))  # Convert the cursor to a list
+    if not user_deeds:
+        return {"error": f"No deeds found for user {user}"}, 404
 
+    # Calculate the total value of deeds
+    total_value = sum(deed.get("price", 0) for deed in user_deeds)  # Default value to 0 if missing
 
-
-
-
-
+    userBalance = user_data.get("balance", 0)
+    userGold = user_data.get("gold", 0)
+    goldValue = userGold * goldRate
+    total = userBalance + goldValue + total_value
+    db.Users.update_one(
+    {"name": user},  
+    {"$set": {"networth": total}})
+    return {"total_net_worth": total}, 200
 
 
 #auction system
