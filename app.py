@@ -14,6 +14,7 @@ import datetime
 import pytz
 import json
 from bson.json_util import dumps
+import time
 
 
 
@@ -35,7 +36,9 @@ db = client[db_name]
 
 GO_AMOUNT = 200000  # Set the amount to be added for GO functionality
 GO_COOLDOWN = timedelta(minutes=3)  # Set the cooldown period
-default_goldrate=1500
+default_goldrate = 500
+default_goldchange = 100 
+goldChangetimer = 180   # seconds
 socketio = SocketIO(app)
 
 
@@ -754,9 +757,9 @@ def update_gold_rate():
 
     # Weighted choice: 2/3 chance to increase, 1/3 chance to decrease
     if random.choices(['increase', 'decrease'], weights=[2, 1])[0] == 'increase':
-        new_rate = current_rate + 500
+        new_rate = current_rate + default_goldchange
     else:
-        new_rate = max(500, current_rate - 500)  # Ensure the rate doesn't go below 0
+        new_rate = max(500, current_rate - default_goldchange)  # Ensure the rate doesn't go below 0
 
     # Use your existing set_gold_rate logic to update the gold rate for user 'Bilal'
     request_data = {'rate': new_rate}
@@ -770,7 +773,7 @@ def update_deeds_prices(goldrate):
     
     # Update each deed's price and rent based on the new gold rate
     for deed in deeds:
-        base_price = deed['baseprice'] / (goldrate / (goldrate + 500))  # Reverse calculation to get base price
+        base_price = deed['baseprice'] / (goldrate / (goldrate + default_goldchange))  # Reverse calculation to get base price
         new_price = base_price * goldrate
         new_rent = new_price / 2
         
@@ -794,13 +797,13 @@ def set_gold_rate():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    db.Users.update_one({'name': 'bilal'}, {'$set': {'goldrate': rate}})
+    db.Users.update_one({'name': 'bilal'}, {'$set': {'goldrate': rate , "goldratechangeTime":datetime.datetime.now()}})
 
     return jsonify({"message": "Gold rate updated successfully"}), 200
 
 # Scheduler to update the gold rate every 60 seconds
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=update_gold_rate, trigger="interval", seconds=300)
+scheduler.add_job(func=update_gold_rate, trigger="interval", seconds=goldChangetimer)
 scheduler.start()
 
 @app.route('/delete_all_users', methods=['DELETE'])
@@ -1148,6 +1151,48 @@ def sell_auction(auction_id):
         app.logger.error(f"Error in sell_auction: {str(e)}")
         return jsonify({'success': False, 'message': 'An error occurred while selling the auction.'})
 
+# Trading
+
+# Simulated BTC Prices (initial dataset)
+btc_prices = [{"time": i, "price": random.randint(30000, 60000)} for i in range(100)]
+
+@app.route('/trading-center', methods=['GET', 'POST'])
+def trading_center():
+    """
+    Trading center where users can trade BTC and see results dynamically.
+    """
+    result = None
+    if request.method == 'POST':
+        # Get trade details
+        current_user = session["user"]
+        user_current_db = db.Users.find_one({"name":current_user})
+        userCurrentGold = user_current_db.get("gold")
+        print("username/btc: ",current_user)
+        trade_type = request.form.get('trade_type')  # 'long' or 'short'
+        amount = float(request.form.get('amount', 0))
+        if userCurrentGold < amount:
+            result = {"status": "failed"}
+            return render_template('trading_center.html', btc_prices=btc_prices, result=result)
+
+        current_price = btc_prices[-1]['price']  # Current BTC price
+
+        # Simulate BTC price movement after 5 seconds
+        time.sleep(1)
+        new_price = current_price + random.randint(-1000, 1000)
+        btc_prices.append({"time": len(btc_prices), "price": new_price})
+        PNL = amount * 0.2
+        # Calculate Profit/Loss
+        if trade_type == 'long' and new_price > current_price:
+            result = {"status": "win", "profit_or_loss": (PNL)}
+            db.Users.update_one({"name":current_user},{"$inc":{"gold":PNL}})
+        elif trade_type == 'short' and new_price < current_price:
+            result = {"status": "win", "profit_or_loss": (PNL)}
+            db.Users.update_one({"name":current_user},{"$inc":{"gold":PNL}})
+        else:
+            result = {"status": "lose", "profit_or_loss": -(abs(PNL))}
+            db.Users.update_one({"name":current_user},{"$inc":{"gold":-PNL}})
+
+    return render_template('trading_center.html', btc_prices=btc_prices, result=result)
 
 
 if __name__ == '__main__':

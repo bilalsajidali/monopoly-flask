@@ -257,6 +257,15 @@
                     class="block w-full py-3 px-4 bg-monopoly-green text-white text-center font-bold rounded-lg hover:bg-green-600 transition-colors duration-300">Go
                     to Banking</a>
             </div>
+
+             <!-- Trading -->
+             <div class="bg-white rounded-xl p-6 shadow-xl transform hover:-translate-y-2 transition-all duration-300">
+                <h5 class="text-2xl font-bold text-monopoly-red mb-4">BTC Trading</h5>
+                <p class="text-gray-600 mb-6">LONG/SHORT/EARN</p>
+                <a href="{{ url_for('trading_center', user=user['name']) }}"
+                    class="block w-full py-3 px-4 bg-monopoly-red text-white text-center font-bold rounded-lg hover:bg-red-600 transition-colors duration-300">Go
+                    to Trading Center</a>
+            </div>
         </div>
 
         <div class="mt-12 text-center">
