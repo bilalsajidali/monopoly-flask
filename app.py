@@ -34,11 +34,12 @@ client = MongoClient(mongo_uri)
 db_name = 'monopoly'  # Replace with your desired database name
 db = client[db_name]
 
-GO_AMOUNT = 200000  # Set the amount to be added for GO functionality
+GO_AMOUNT = 250000  # Set the amount to be added for GO functionality
 GO_COOLDOWN = timedelta(minutes=3)  # Set the cooldown period
 default_goldrate = 500
 default_goldchange = 100 
 goldChangetimer = 180   # seconds
+loanInterestrate = 0.4  
 socketio = SocketIO(app)
 
 
@@ -412,14 +413,21 @@ def banking():
                 userLoan = user.get('loan', 0)
                 userNetWorth = user.get('networth',0)
                 max_loan_limit_official = userNetWorth * 0.3
-                loanInterest = amount * 0.15  # 15% interest
+                loanInterest = amount * loanInterestrate
                 max_loan_limit = max_loan_limit_official - userLoan
 
                 # Loan approval criteria
                 if (amount <= max_loan_limit and amount > 0):
                     # Update user's balance and loan
                     new_balance = userBalance + amount
-                    new_loan = userLoan + amount + loanInterest
+                    if user.get("mosque")==True:
+                        new_loan = userLoan + amount     # if has mosque than no interest
+                        flash(f'Loan of {amount} with NO interest approved and credited to your account.', 'success')
+
+                    else:
+                        new_loan = userLoan + amount + loanInterest
+                        flash(f'Loan of {amount} with {loanInterestrate*100}% interest {loanInterest} approved and credited to your account.', 'success')
+
                     db.Users.update_one(
                         {'name': current_user}, 
                         {'$set': {
@@ -428,7 +436,6 @@ def banking():
                         }}
                     )
                     
-                    flash(f'Loan of {amount} with interest {loanInterest} approved and credited to your account.', 'success')
                 else:
                     # Loan denied
                     denial_reasons = []
@@ -766,6 +773,22 @@ def update_gold_rate():
     with app.test_request_context(json=request_data):  # Simulate a request context
         response = set_gold_rate()
         update_deeds_prices(new_rate)
+        # Disburse rental income
+        disburse_rental_income()
+
+
+def disburse_rental_income():
+    # Fetch all users with rent_income
+    users_with_rent = db.Users.find({"rent_income": {"$exists": True, "$gt": 0}})
+    for user in users_with_rent:
+        user_name = user['name']
+        rent_income = user['rent_income']
+
+        # Add rental income to user's balance
+        new_balance = user.get('balance', 0) + rent_income
+        db.Users.update_one({"name": user_name}, {"$set": {"balance": new_balance}})
+        print(f"Disbursed {rent_income} to user {user['name']}. New balance: {new_balance}")
+
 
 def update_deeds_prices(goldrate):
     # Fetch all deeds from the Deeds collection
@@ -801,7 +824,7 @@ def set_gold_rate():
 
     return jsonify({"message": "Gold rate updated successfully"}), 200
 
-# Scheduler to update the gold rate every 60 seconds
+# Scheduler to update the gold rate every goldChangetimer
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=update_gold_rate, trigger="interval", seconds=goldChangetimer)
 scheduler.start()
@@ -863,8 +886,9 @@ def Networth():
 
     userBalance = user_data.get("balance", 0)
     userGold = user_data.get("gold", 0)
+    userPerkWorth = user_data.get("perkWorth",0)
     goldValue = userGold * goldRate
-    total = userBalance + goldValue + total_value
+    total = userBalance + goldValue + total_value + userPerkWorth
     db.Users.update_one(
     {"name": user},  
     {"$set": {"networth": total}})
@@ -1194,9 +1218,105 @@ def trading_center():
 
     return render_template('trading_center.html', btc_prices=btc_prices, result=result)
 
+# perks
+@app.route('/perks', methods=['GET'])
+def perks():
+    """Render the perks page."""
+    return render_template('perks.html')
+
+
+@app.route('/buy_perk', methods=['POST'])
+def buy_perk():
+    """Handle the purchase of a perk."""
+    
+    # Get perk from form data
+    perk = request.form.get('perk')
+
+    # Determine the current user
+    current_user = session['user']
+    
+    if not current_user:
+        flash("No user specified.", "danger")
+        return redirect(url_for('perks'))
+
+    # Initialize investment_amount to 0 by default
+    investment_amount = 0
+
+    # Only get investment_amount if the perk is 'investinbank'
+    if perk == 'investinbank':
+        # Safely get the 'investment_amount' field, with error handling
+        try:
+            investment_amount = int(request.form.get('investment_amount', 0))
+            print(f"Investment Amount: {investment_amount}")  # Debugging: Check the investment amount
+            
+            # Validate the investment amount
+            if investment_amount <= 0:
+                flash("Investment amount must be greater than 0.", "danger")
+                return redirect(url_for('perks'))
+        except (ValueError, TypeError):
+            flash("Invalid investment amount.", "danger")
+            return redirect(url_for('perks'))
+
+    # User details from DB
+    user = db.Users.find_one({"name": current_user})
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for('perks'))
+    
+    # Check if the user already has the perk
+    if perk != 'investinbank' and perk in user:
+        flash("You already have this perk!", "danger")
+        return redirect(url_for('perks'))
+
+    user_balance = user.get('balance', 0)
+    
+    # Define perk costs (investment_amount is used only for 'investinbank')
+    perk_costs = {
+        'mosque': 500000,
+        'hotel': 2500000,
+        'rolls_royce': 1500000,
+        'investinbank': investment_amount if perk == 'investinbank' else 0
+    }
+
+    perk_benefits = {
+        'mosque': lambda user: db.Users.update_one({"name": current_user}, {"$set": {"mosque": True}}),
+        'hotel': lambda user: db.Users.update_one({"name": current_user}, {
+            "$inc": {"perkWorth": 2 * perk_costs['hotel']},
+            "$set": {"rent_income": 0.02 * perk_costs['hotel'], "hotel": True}
+        }),
+        'rolls_royce': lambda user: db.Users.update_one({"name": current_user}, {
+            "$inc": {"perkWorth": 5 * perk_costs['rolls_royce']},
+            "$set": {"rolls_royce": True}
+        }),
+        'investinbank': lambda user: db.Users.update_one({"name": current_user}, {
+            "$set": {"investinbank": True},
+            "$inc": {"rent_income": investment_amount * 0.1,"investinbankamount":investment_amount}
+        })
+    }
+
+    # Validate if the perk is in the perk_costs dictionary
+    if perk not in perk_costs:
+        flash("Invalid perk selected.", "danger")
+        return redirect(url_for('perks'))
+
+    # Get the cost for the selected perk
+    cost = perk_costs[perk]
+
+    # Check if the user has enough balance
+    if user_balance < cost:
+        flash("Insufficient funds to buy this perk.", "danger")
+        return redirect(url_for('perks'))
+
+    # Deduct the cost and apply the perk benefit
+    db.Users.update_one({"name": current_user}, {"$inc": {"balance": -cost}})
+    perk_benefits[perk](user)
+
+    flash(f"Successfully purchased {perk}!", "success")
+    return redirect(url_for('perks'))
+
 
 if __name__ == '__main__':
     try:
-       socketio.run(app, host='0.0.0.0', port=5000 , debug=True)
+       socketio.run(app, host='0.0.0.0', port=5000 , debug=True, use_reloader=False)
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()

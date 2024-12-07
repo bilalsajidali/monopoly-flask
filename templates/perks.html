@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monopoly Perks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        poppins: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        monopoly: {
+                            red: '#ED1B24',
+                            blue: '#0072BC',
+                            green: '#00A650',
+                            yellow: '#FFF200',
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+
+<body
+    class="font-poppins bg-gradient-to-br from-monopoly-blue to-monopoly-green min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-5xl mx-auto">
+        <!-- Flash messages -->
+        <div id="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="max-w-md mx-auto mb-6">
+                <div
+                    class="{% if category == 'success' %}bg-green-100 border-green-500 text-green-700{% elif category == 'danger' %}bg-red-100 border-red-500 text-red-700{% else %}bg-gray-100 border-gray-500 text-gray-700{% endif %} border-l-4 p-4 rounded-lg">
+                    {{ message }}
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+        </div>
+        <h1 class="text-5xl font-extrabold text-center mb-12 text-yellow-500 drop-shadow-lg">Monopoly Perks</h1>
+
+        <!-- Perks Section -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Build a Mosque -->
+            <div class="bg-white p-8 rounded-xl shadow-2xl">
+                <div class="text-center">
+                    <img src="https://img.icons8.com/color/96/mosque.png" alt="Build a Mosque" class="mx-auto mb-4">
+                    <h2 class="text-3xl font-bold mb-4 text-yellow-500">Build a Mosque</h2>
+                    <p class="text-gray-600 mb-6">Removes interest on your loans from the bank.</p>
+                    <form action="{{ url_for('buy_perk', perk='mosque', user=current_user) }}" method="POST">
+                        <input type="hidden" name="perk" value="mosque">
+                        <button type="submit"
+                            class="w-full px-6 py-3 bg-yellow-500 text-white font-bold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-colors duration-300">Buy
+                            for 500k</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Buy a Prosper Hotel -->
+            <div class="bg-white p-8 rounded-xl shadow-2xl">
+                <div class="text-center">
+                    <img src="https://img.icons8.com/color/96/building.png" alt="Prosper Hotel" class="mx-auto mb-4">
+                    <h2 class="text-3xl font-bold mb-4 text-yellow-500">Prosper Hotel</h2>
+                    <p class="text-gray-600 mb-6">Increases net worth by 2x gives 2% as rent.</p>
+                    <form action="{{ url_for('buy_perk', perk='hotel', user=current_user) }}" method="POST">
+                        <input type="hidden" name="perk" value="hotel">
+                        <button type="submit"
+                            class="w-full px-6 py-3 bg-yellow-500 text-white font-bold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-colors duration-300">Buy
+                            for 2.5M</button>
+                    </form>
+                </div>
+            </div>
+
+
+            <!-- Buy a Rolls Royce -->
+            <dyellow class="bg-white p-8 rounded-xl shadow-2xl">
+                <div class="text-center">
+                    <img src="https://img.icons8.com/color/96/rolls-royce.png" alt="Rolls Royce" class="mx-auto mb-4">
+                    <h2 class="text-3xl font-bold mb-4 text-yellow-500">Rolls Royce</h2>
+                    <p class="text-gray-600 mb-6">Increases net worth by 5x the amount of the car.</p>
+                    <form action="{{ url_for('buy_perk', perk='rolls_royce', user=current_user) }}" method="POST">
+                        <input type="hidden" name="perk" value="rolls_royce">
+                        <button type="submit"
+                            class="w-full px-6 py-3 bg-yellow-500 text-white font-bold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-colors duration-300">Buy
+                            for 1.5M</button>
+                    </form>
+                </div>
+            </dyellow
+            <!-- Invest In Bank -->
+            <div class="bg-white p-8 rounded-xl shadow-2xl">
+                <div class="text-center">
+
+                    <img src="https://img.icons8.com/color/96/money.png" alt="Invest in Bank" class="mx-auto mb-4">
+                    <h2 class="text-3xl font-bold mb-4 text-yellow-500">Invest IN Bank</h2>
+                    <p class="text-gray-600 mb-6">Take 10% of Investment as Rental income.</p>
+                    <form action="{{ url_for('buy_perk', perk='investinbank', user=current_user) }}" method="POST" class="bg-white p-4 rounded-lg shadow-md">
+                        <input type="hidden" name="perk" value="investinbank">
+                        <div class="mb-4">
+
+                            <label for="investment_amount" class="block text-gray-700 font-semibold mb-2">Investment
+                                Amount:</label>
+                            <input type="number" id="investment_amount" name="investment_amount"
+                                class="w-full px-4 py-2 rounded-lg bg-gray-100 border-transparent focus:border-monopoly-yellow focus:bg-white focus:ring-0"
+                                min="1" placeholder="Enter amount to invest" required>
+                        </div>
+                        <button type="submit"
+                            class="w-full px-6 py-3 bg-yellow-500 text-gray-100 font-bold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:ring-opacity-50 transition-colors duration-300">
+                            Invest Now
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-12 text-center">
+            <a href="{{ url_for('dashboard', user=current_user) }}"
+                class="inline-block px-8 py-4 bg-white text-monopoly-blue font-bold rounded-full hover:bg-gray-100 transition-colors duration-300">Back
+                to Dashboard</a>
+        </div>
+    </div>
+</body>
+
+</html>
