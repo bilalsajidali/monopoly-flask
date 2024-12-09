@@ -36,10 +36,12 @@ db = client[db_name]
 
 GO_AMOUNT = 250000  # Set the amount to be added for GO functionality
 GO_COOLDOWN = timedelta(minutes=3)  # Set the cooldown period
-default_goldrate = 500
-default_goldchange = 100 
-goldChangetimer = 180   # seconds
-loanInterestrate = 0.4  
+default_goldrate = 1000  #game starting gold rate
+default_goldchange = 500  # change by 500 + - in rate
+goldChangetimer = 180   # 180 seconds -- 3min
+loanInterestrate = 0.4  #40%
+loanLimit = 0.4         #40%
+lowestGoldRate = 1000   # lowest rate of gold fall 1000 pkr
 socketio = SocketIO(app)
 
 
@@ -98,7 +100,7 @@ def add_user():
                 new_user['goldrate'] = default_goldrate
                 create_deed()
                 
-            elif name == 'abdulrehman':
+            elif name == 'banker':
                 new_user['role'] = 'banker'
                 new_user['requests_count'] = 0
             
@@ -423,7 +425,7 @@ def banking():
                 userBalance = user.get('balance', 0)
                 userLoan = user.get('loan', 0)
                 userNetWorth = user.get('networth',0)
-                max_loan_limit_official = userNetWorth * 0.3
+                max_loan_limit_official = userNetWorth * loanLimit
                 loanInterest = amount * loanInterestrate
                 max_loan_limit = max_loan_limit_official - userLoan
 
@@ -786,7 +788,7 @@ def update_gold_rate():
     if random.choices(['increase', 'decrease'], weights=[2, 1])[0] == 'increase':
         new_rate = current_rate + default_goldchange
     else:
-        new_rate = max(500, current_rate - default_goldchange)  # Ensure the rate doesn't go below 0
+        new_rate = max(lowestGoldRate, current_rate - default_goldchange)  # Ensure the rate doesn't go below 0
 
     # Use your existing set_gold_rate logic to update the gold rate for user 'Bilal'
     request_data = {'rate': new_rate}
@@ -816,13 +818,17 @@ def update_deeds_prices(goldrate):
     
     # Update each deed's price and rent based on the new gold rate
     for deed in deeds:
-        base_price = deed['baseprice'] / (goldrate / (goldrate + default_goldchange))  # Reverse calculation to get base price
-        new_price = base_price * goldrate
-        new_rent = new_price / 2
+        if 'auctionedLand' in deed:
+            new_price = deed['auctionRate']
+            new_rent = deed['auctionRent']
+        else:
+            base_price = deed['baseprice'] / (goldrate / (goldrate + default_goldchange))  # Reverse calculation to get base price
+            new_price = base_price * goldrate
+            new_rent = new_price / 2
         
         db.Deeds.update_one(
             {'_id': deed['_id']},
-            {'$set': {'price': new_price, 'rent': new_rent}}
+            {'$set': {'price': round(new_price), 'rent': round(new_rent)}}
         )
 
 
@@ -875,6 +881,7 @@ def endGame():
     result2 = db.Users.delete_many({})
     result3 = db.Deeds.delete_many({})
     result4 = db.Auctions.delete_many({})
+    result5 = db.Transactions.delete_many({})
     return jsonify({"message": f"DB cleared!- GAME ENDS"}), 200
 
 
@@ -1182,14 +1189,17 @@ def sell_auction(auction_id):
         # Update deed ownership and deduct amount from the highest bidder
         db.Users.update_one({'name': highest_bidder}, {'$inc': {'balance': -bid_amount}})
         db.Users.update_one({'name': auction['creator']}, {'$inc': {'balance': bid_amount}})
-        db.Deeds.update_one({'_id': ObjectId(deed_id)}, {'$set': {'owner': highest_bidder}})
+        db.Deeds.update_one({'_id': ObjectId(deed_id)}, {'$set': {'owner': highest_bidder,"auctionRate":round(bid_amount/1.5),"auctionRent":round(bid_amount/4),"auctionedLand":True,"rent":round(bid_amount/4),"price":round(bid_amount/1.5)}})
 
         # Mark the auction as completed
         db.Auctions.update_one({'_id': ObjectId(auction_id)}, {'$set': {'status': 'completed'}})
 
         # Broadcast the auction as sold
         socketio.emit('auction_sold', {'auction_id': auction_id, 'highest_bidder': highest_bidder, 'bid_amount': bid_amount}, to="broadcast")
-
+        #buyer
+        record_transaction(highest_bidder,f"Auction Purchase {auction.get("deed_name")}", debit=bid_amount)
+        #seller
+        record_transaction(auction['creator'],f"Auction Sold {auction.get("deed_name")}", credit=bid_amount)
         return jsonify({'success': True, 'message': 'Auction sold successfully.'})
     except Exception as e:
         app.logger.error(f"Error in sell_auction: {str(e)}")
