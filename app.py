@@ -265,7 +265,8 @@ def gold_shop():
                                 )
 
                                 if buyer_result.modified_count > 0 and seller_result.modified_count > 0:
-                                    flash(f'Gold purchased successfully! You bought {amount:.4f} units of gold for {total_cost:.2f} PKR.', 'success')
+                                    flash(f'Gold purchased successfully! You bought {amount:.2f}g of gold for {total_cost:.2f} PKR.', 'success')
+                                    record_transaction(current_user,f"Gold Purchase {amount:.2f}g",debit=total_cost)
                                 else:
                                     # Rollback if one update succeeded but the other failed
                                     if buyer_result.modified_count > 0:
@@ -284,7 +285,8 @@ def gold_shop():
                                     {'name': current_user},
                                     {'$inc': {'balance': -total_cost, 'gold': amount}}
                                 )
-                                flash(f'Gold purchased successfully! You bought {amount:.4f} units of gold for {total_cost:.2f} PKR.' if result.modified_count > 0 else 'Failed to purchase gold.', 'success' if result.modified_count > 0 else 'danger')
+                                flash(f'Gold purchased successfully! You bought {amount:.2f}g of gold for {total_cost:.2f} PKR.' if result.modified_count > 0 else 'Failed to purchase gold.', 'success' if result.modified_count > 0 else 'danger')
+                                record_transaction(current_user,f"Gold Purchase {amount:.2f}g",debit=total_cost)
                         except Exception as e:
                             app.logger.error(f"Error during gold purchase: {str(e)}")
                             flash('An error occurred during the purchase. Please try again.', 'danger')
@@ -302,9 +304,11 @@ def gold_shop():
                                     {'name': current_user},
                                     {'$inc': {'balance': total_money, 'gold': -amount}}
                                 )
-
+                                
                                 if seller_result.modified_count > 0:
-                                    flash(f'Gold sold successfully! You sold {amount:.4f} units of gold for {total_money:.2f} PKR.', 'success')
+                                    flash(f'Gold sold successfully! You sold {amount:.2f}g of gold for {total_money:.2f} PKR.', 'success')
+                                    record_transaction(current_user,f"Gold Sold {amount:.2f}g",credit=total_money)
+
                                 else:
                                     flash('Failed to sell gold. Please try again.', 'danger')
                             else:  # Bilal selling gold
@@ -312,7 +316,9 @@ def gold_shop():
                                     {'name': current_user},
                                     {'$inc': {'balance': total_money, 'gold': -amount}}
                                 )
-                                flash(f'Gold sold successfully! You sold {amount:.4f} units of gold for {total_money:.2f} PKR.' if result.modified_count > 0 else 'Failed to sell gold.', 'success' if result.modified_count > 0 else 'danger')
+                                flash(f'Gold sold successfully! You sold {amount:.2f}g of gold for {total_money:.2f} PKR.' if result.modified_count > 0 else 'Failed to sell gold.', 'success' if result.modified_count > 0 else 'danger')
+                                record_transaction(current_user,f"Gold Sold {amount:.2f}g",credit=total_money)
+
                         except Exception as e:
                             app.logger.error(f"Error during gold sale: {str(e)}")
                             flash('An error occurred during the sale. Please try again.', 'danger')
@@ -357,6 +363,11 @@ def transfers():
             db.Users.update_one({'name': receiver_name}, {'$inc': {'balance': amount}})
             
             flash('Transfer successful!', 'success')
+            # for sender - history
+            record_transaction(sender_name,f"Transfer to {receiver_name}",debit=amount)
+            # for receiver - history
+            record_transaction(receiver_name,f"Received from {sender_name}",credit=amount)
+            
             return redirect(url_for('transfers', user=current_user))
         except Exception as e:
             print("Error processing transfer:", e)
@@ -423,11 +434,13 @@ def banking():
                     if user.get("mosque")==True:
                         new_loan = userLoan + amount     # if has mosque than no interest
                         flash(f'Loan of {amount} with NO interest approved and credited to your account.', 'success')
+                        record_transaction(current_user,f"LOAN",credit=amount)
+
 
                     else:
                         new_loan = userLoan + amount + loanInterest
                         flash(f'Loan of {amount} with {loanInterestrate*100}% interest {loanInterest} approved and credited to your account.', 'success')
-
+                        record_transaction(current_user,f"LOAN",credit=amount)
                     db.Users.update_one(
                         {'name': current_user}, 
                         {'$set': {
@@ -479,8 +492,11 @@ def banking():
                 # Check if loan is fully repaid
                 if new_loan == 0:
                     flash(f'Loan fully repaid. Remaining balance: {new_balance}', 'success')
+                    record_transaction(current_user,f"Repay-Loan",debit=amount)
                 else:
                     flash(f'Partial loan repayment. Remaining loan: {new_loan}', 'success')
+                    record_transaction(current_user,f"Repay-Loan",debit=amount)
+
                 
                 return redirect(url_for('banking', user=current_user))
 
@@ -535,6 +551,7 @@ def bank_approval():
                         {'name': request_data['user']},
                         {'$inc': {'balance': request_data['amount']}}
                     )
+                    record_transaction(request_data['user'],f"Deposit",credit=request_data['amount'])
                 elif request_data['action'] == 'loan':
                     db.Users.update_one(
                         {'name': request_data['user']},
@@ -555,6 +572,8 @@ def bank_approval():
                             {'name': request_data['user']},
                             {'$inc': {'balance': -request_data['amount']}}
                         )
+                        record_transaction(request_data['user'],f"Withdraw",debit=request_data['amount'])
+
                     else:
                         flash(f"Insufficient balance to withdraw {request_data['amount']} PKR.", 'danger')
                         return redirect(url_for('bank_approval'))
@@ -613,6 +632,7 @@ def go():
                 '$set': {'last_go_time': current_time}
             }
         )
+        record_transaction(user.get('name'),f"GO",credit=GO_AMOUNT)
 
         if result.modified_count > 0:
             return jsonify({
@@ -787,7 +807,7 @@ def disburse_rental_income():
         # Add rental income to user's balance
         new_balance = user.get('balance', 0) + rent_income
         db.Users.update_one({"name": user_name}, {"$set": {"balance": new_balance}})
-        print(f"Disbursed {rent_income} to user {user['name']}. New balance: {new_balance}")
+        record_transaction(user_name,f"rental Income",credit=rent_income)
 
 
 def update_deeds_prices(goldrate):
@@ -1309,10 +1329,44 @@ def buy_perk():
 
     # Deduct the cost and apply the perk benefit
     db.Users.update_one({"name": current_user}, {"$inc": {"balance": -cost}})
+    record_transaction(current_user , f"Perk Purchased {perk}", debit= cost)
     perk_benefits[perk](user)
 
     flash(f"Successfully purchased {perk}!", "success")
     return redirect(url_for('perks'))
+
+
+
+
+
+# History 
+def record_transaction(user, description, credit=0, debit=0):
+    """Record a transaction in the database with PKT time in 12-hour format."""
+    # Define the PKT timezone
+    pkt = pytz.timezone('Asia/Karachi')
+    # Get the current time in PKT in 12-hour format with AM/PM
+    current_time = datetime.datetime.now(pkt).strftime("%I:%M:%S %p")
+    
+    # Insert the transaction with the time
+    db.Transactions.insert_one({
+        "user": user,
+        "time": current_time,
+        "description": description,
+        "credit": credit,
+        "debit": debit
+    })
+
+@app.route('/history', methods=['GET'])
+def history():
+    """Display the user's transaction history."""
+    current_user = session['user']
+
+    # Fetch user's transactions from the database
+    transactions = list(db.Transactions.find({"user": current_user}).sort("time", -1))
+
+    # Render history page
+    return render_template('history.html', transactions=transactions)
+
 
 
 if __name__ == '__main__':

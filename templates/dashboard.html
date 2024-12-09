@@ -20,6 +20,7 @@
                             blue: '#0072BC',
                             green: '#00A650',
                             yellow: '#FFF200',
+                            purple: '#8E44AD',
                         },
                     },
                 },
@@ -254,7 +255,7 @@
                 <h5 class="text-2xl font-bold text-monopoly-green mb-4">Banking</h5>
                 <p class="text-gray-600 mb-6">Deposit/Withdraw/Loans</p>
                 <a href="{{ url_for('banking', user=user['name']) }}"
-                    class="block w-full py-3 px-4 bg-monopoly-green text-white text-center font-bold rounded-lg hover:bg-green-600 transition-colors duration-300">Go
+                    class="block w-full py-3 px-4 bg-monopoly-green text-white text-center font-bold rounded-lg hover:bg-green-700 transition-colors duration-300">Go
                     to Banking</a>
             </div>
 
@@ -271,10 +272,19 @@
             <!-- PERKS -->
             <div class="bg-white rounded-xl p-6 shadow-xl transform hover:-translate-y-2 transition-all duration-300">
                 <h5 class="text-2xl font-bold text-yellow-500 mb-4">Perks</h5>
-                <p class="text-gray-600 mb-6">Earn Special abilities , Earn Perks</p>
+                <p class="text-gray-600 mb-6">Buy Perks, Earn Special abilities </p>
                 <a href="{{ url_for('perks', user=user['name']) }}"
                     class="block w-full py-3 px-4 bg-yellow-500 text-white text-center font-bold rounded-lg hover:bg-yellow-600 transition-colors duration-300">Go
                     to Trading Center</a>
+            </div>
+
+             <!-- History -->
+             <div class="bg-white rounded-xl p-6 shadow-xl transform hover:-translate-y-2 transition-all duration-300">
+                <h5 class="text-2xl font-bold text-monopoly-purple mb-4">History</h5>
+                <p class="text-gray-600 mb-6"> CREDIT | DEBIT ,Track record of your every transaction </p>
+                <a href="{{ url_for('history', user=user['name']) }}"
+                    class="block w-full py-3 px-4 bg-monopoly-purple text-white text-center font-bold rounded-lg hover:bg-purple-600 transition-colors duration-300">Go
+                    to History</a>
             </div>
         </div>
 

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction History</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        poppins: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        monopoly: {
+                            red: '#ED1B24',
+                            blue: '#0072BC',
+                            green: '#00A650',
+                            yellow: '#FFF200',
+                            orange: '#FF9900',
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+
+<body
+    class="font-poppins bg-gradient-to-br from-monopoly-blue to-monopoly-green min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-5xl mx-auto">
+        <!-- Flash messages -->
+        <div id="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="max-w-md mx-auto mb-6">
+                <div
+                    class="{% if category == 'success' %}bg-green-100 border-green-500 text-green-700{% elif category == 'danger' %}bg-red-100 border-red-500 text-red-700{% else %}bg-gray-100 border-gray-500 text-gray-700{% endif %} border-l-4 p-4 rounded-lg">
+                    {{ message }}
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+        </div>
+
+        <h1 class="text-5xl font-extrabold text-center mb-12 text-white drop-shadow-lg">Transaction History</h1>
+
+        <!-- Transactions Table -->
+        <div class="bg-white p-8 rounded-xl shadow-2xl">
+            <div class="overflow-x-auto">
+                <table class="table-auto w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 uppercase text-sm">
+                            <th class="px-6 py-3 border-b-2 border-gray-300">Date</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300">Description</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 text-green-600">Credit</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 text-red-600">Debit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in transactions %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 border-b border-gray-200">{{ transaction.time }}</td>
+                            <td class="px-6 py-4 border-b border-gray-200">{{ transaction.description }}</td>
+                            <td class="px-6 py-4 border-b border-gray-200 text-green-600">
+                                {{ transaction.credit if transaction.credit else '-' }}
+                            </td>
+                            <td class="px-6 py-4 border-b border-gray-200 text-red-600">
+                                {{ transaction.debit if transaction.debit else '-' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- No transactions message -->
+            {% if transactions|length == 0 %}
+            <p class="text-center text-gray-500 mt-4">
+                No transactions found. Your account activity will appear here.
+            </p>
+            {% endif %}
+        </div>
+
+        <div class="mt-12 text-center">
+            <a href="{{ url_for('dashboard', user=current_user) }}"
+                class="inline-block px-8 py-4 bg-white text-monopoly-blue font-bold rounded-full hover:bg-gray-100 transition-colors duration-300">
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+</body>
+
+</html>
