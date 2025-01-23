@@ -1319,8 +1319,8 @@ def buy_perk():
             "$set": {"rolls_royce": True}
         }),
         'investinbank': lambda user: db.Users.update_one({"name": current_user}, {
-            "$inc": {"rent_income": investment_amount * 0.1,"investinbankamount":investment_amount}
-            "$set": {"investinbank": True},
+            "$inc": {"rent_income": investment_amount * 0.1,"investinbankamount":investment_amount},
+            "$set": {"investinbank": True}
         })
     }
 
