@@ -34,7 +34,7 @@ client = MongoClient(mongo_uri)
 db_name = 'monopoly'  # Replace with your desired database name
 db = client[db_name]
 
-GO_AMOUNT = 250000  # Set the amount to be added for GO functionality
+GO_AMOUNT = 300000  # Set the amount to be added for GO functionality
 GO_COOLDOWN = timedelta(minutes=3)  # Set the cooldown period
 default_goldrate = 1000  #game starting gold rate
 default_goldchange = 500  # change by 500 + - in rate
@@ -1311,16 +1311,16 @@ def buy_perk():
     perk_benefits = {
         'mosque': lambda user: db.Users.update_one({"name": current_user}, {"$set": {"mosque": True}}),
         'hotel': lambda user: db.Users.update_one({"name": current_user}, {
-            "$inc": {"perkWorth": 2 * perk_costs['hotel']},
-            "$set": {"rent_income": 0.02 * perk_costs['hotel'], "hotel": True}
+            "$inc": {"perkWorth": 2 * perk_costs['hotel'],"rent_income": 0.02 * perk_costs['hotel']},
+            "$set": {"hotel": True}
         }),
         'rolls_royce': lambda user: db.Users.update_one({"name": current_user}, {
             "$inc": {"perkWorth": 5 * perk_costs['rolls_royce']},
             "$set": {"rolls_royce": True}
         }),
         'investinbank': lambda user: db.Users.update_one({"name": current_user}, {
-            "$set": {"investinbank": True},
             "$inc": {"rent_income": investment_amount * 0.1,"investinbankamount":investment_amount}
+            "$set": {"investinbank": True},
         })
     }
 
