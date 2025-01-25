@@ -323,6 +323,7 @@
                 if (data.success) {
                     activeAuctions[data.auction._id] = data.auction;
                     alert(`1 new Auction created ${data.auction.deed_name} !`);
+                    location.reload();
                     //updateAuctionUI();
                 } else {
                     alert('Failed to create auction: ' + data.message);
@@ -399,8 +400,8 @@
                 } else {
                     auctionCard.innerHTML = `
                 <h3 class="text-xl font-bold mb-2">${auction.deed_name}</h3>
-                <p class="text-gray-600">Deed Current Rent: ${auction.deed_rent || 'None'}</p>
                 <p class="text-gray-600">Current Bid: PKR ${auction.current_bid}</p>
+                <p class="text-gray-600">Current Rent: ${auction.deed_rent || 'None'}</p>
                 <p class="text-gray-600">Highest Bidder: ${auction.highest_bidder || 'None'}</p>
                 <input type="number" id="bid-input-${auctionId}" class="mt-2 p-2 border rounded" placeholder="Your bid">
                 <button onclick="placeBid('${auctionId}')" class="mt-2 px-4 py-2 bg-monopoly-blue text-white rounded">Place Bid</button>
@@ -412,12 +413,13 @@
             }
         }
 
+
         function placeBid(auctionId) {
             const user = "{{ user['name'] }}";
             const bidInput = document.getElementById(`bid-input-${auctionId}`);
             const bidAmount = parseFloat(bidInput.value);
 
-            if (isNaN(bidAmount) || bidAmount <= activeAuctions[auctionId].current_bid) {
+            if (isNaN(bidAmount) || bidAmount < activeAuctions[auctionId].current_bid) {
                 alert('Please enter a valid bid higher than the current bid.');
                 return;
             }
@@ -429,7 +431,9 @@
                 bid_amount: bidAmount
             });
             bidInput.value = '';
+            location.reload();
         }
+
 
         function sellDeed(auctionId) {
             // Call backend to mark the deed as sold and transfer ownership
@@ -444,6 +448,7 @@
                     if (data.success) {
                         alert('Deed sold successfully!');
                         // Optionally refresh the auction UI
+                        location.reload();
                         updateAuctionUI();
                     } else {
                         alert('Error selling the deed.');
@@ -453,6 +458,7 @@
                     console.error('Error:', error);
                 });
         }
+
 
         function cancelAuction(auctionId) {
             // Call backend to cancel the auction
@@ -466,6 +472,7 @@
                 .then(data => {
                     if (data.success) {
                         alert('Auction canceled successfully!');
+                        location.reload();
                         // Optionally refresh the auction UI
                         updateAuctionUI();
                     } else {
@@ -478,8 +485,6 @@
         }
 
 
-
-
         function createAuction(deedId, startingBid) {
             const user = "{{ user['name'] }}";
             console.log(user, "before create auction")
@@ -489,6 +494,7 @@
                 starting_bid: startingBid,
                 user: user
             });
+            location.reload();
         }
 
         // Modify the openAuctionModal function

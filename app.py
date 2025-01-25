@@ -25,13 +25,17 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = 'hellothisismysecretkey'
 # Load MongoDB URI from environment variables
+app_env=os.getenv('FLASK_ENV')
 mongo_uri = os.getenv('MONGODB_URI')
 if not mongo_uri:
     raise ValueError("MONGODB_URI not found in environment variables.")
 
 # Initialize MongoDB client
 client = MongoClient(mongo_uri)
-db_name = 'monopoly'  # Replace with your desired database name
+if app_env == 'dev':
+    db_name = 'monopolyDevelopment'  # Replace with your desired database name
+else:
+    db_name = 'monopoly'
 db = client[db_name]
 
 GO_AMOUNT = 300000  # Set the amount to be added for GO functionality
@@ -1082,7 +1086,7 @@ def on_place_bid(data):
 
     if bid_amount > user_balance:
         emit('bid_error', {'message': 'Insufficient balance'})
-    elif bid_amount <= auction['current_bid']:
+    elif bid_amount < auction['current_bid']:
         emit('bid_error', {'message': 'Bid must be higher than current bid'})
     else:
         # Update the auction
