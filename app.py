@@ -46,6 +46,7 @@ goldChangetimer = 180   # 180 seconds -- 3min
 loanInterestrate = 0.4  #40%
 loanLimit = 0.4         #40%
 lowestGoldRate = 1000   # lowest rate of gold fall 1000 pkr
+
 socketio = SocketIO(app, cors_allowed_origins=["https://www.monopolymagic.fun","http://monopolymagic.fun"])
 
 
