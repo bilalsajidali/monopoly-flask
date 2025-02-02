@@ -46,8 +46,8 @@ goldChangetimer = 180   # 180 seconds -- 3min
 loanInterestrate = 0.4  #40%
 loanLimit = 0.4         #40%
 lowestGoldRate = 1000   # lowest rate of gold fall 1000 pkr
-
-socketio = SocketIO(app, cors_allowed_origins=["https://www.monopolymagic.fun","http://monopolymagic.fun"])
+start_balance= 500000  # starting balance of user
+socketio = SocketIO(app, cors_allowed_origins=["https://www.monopolymagic.fun","https://monopolymagic.fun"])
 
 
 
@@ -94,7 +94,7 @@ def add_user():
             new_user = {
                 'name': name,
                 'password': password,
-                'balance': 0,
+                'balance': start_balance,
                 'gold': 0,
                 'role': 'player',
                 'loan': 0
