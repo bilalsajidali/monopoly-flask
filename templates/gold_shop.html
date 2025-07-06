@@ -37,6 +37,13 @@
     <div class="max-w-7xl mx-auto">
         <h1 class="text-5xl font-extrabold text-center mb-12 text-white drop-shadow-lg">Monopoly Gold Shop</h1>
 
+        <!-- Total Gold Available -->
+        <div class="max-w-md mx-auto mb-8">
+            <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg text-center text-lg font-semibold">
+                Total Gold Available to Buy: <span class="font-bold">{{ total_gold_available | default(0) | round(2) }} grams</span>
+            </div>
+        </div>
+
         <!-- Flash messages -->
         <div id="flash-messages"> 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -56,7 +63,7 @@
             <!-- Buy Gold Card -->
             <div class="bg-white p-8 rounded-xl shadow-2xl">
                 <h2 class="text-3xl font-bold mb-6 text-monopoly-yellow">Buy Gold</h2>
-                <p class="text-gray-600 mb-6">Current Gold Rate: <span class="font-semibold">PKR {{ gold_buy_rate }} per gram</span></p>
+                <p class="text-gray-600 mb-6">Current Gold Rate: <span class="font-semibold">PKR {{ display_buy_rate }} per gram</span></p>
                 <form action="{{ url_for('gold_shop', user=current_user) }}" method="POST">
                     <input type="hidden" name="current_user" value="{{ current_user }}">
                     <div class="mb-6">
@@ -103,7 +110,7 @@
             var buyQuantity = document.getElementById('buy_quantity');
             var sellAmount = document.getElementById('sell_amount');
             var sellMoney = document.getElementById('sell_money');
-            var goldBuyRate = parseFloat('{{ gold_buy_rate|default(0) }}');
+            var goldBuyRate = parseFloat('{{ display_buy_rate|default(0) }}');
             var goldSellRate = parseFloat('{{ gold_sell_rate|default(0) }}');
     
             if (buyCash) {

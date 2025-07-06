@@ -227,6 +227,7 @@ def gold_shop():
 
         bank_gold_rate = gold_seller_user["goldrate"]
         seller_rate = bank_gold_rate * 0.20  # 20% of bank_gold_rate
+        total_gold_available = float(gold_seller_user['gold'])
 
         # Default rates for other users
         buy_rate = bank_gold_rate
@@ -334,7 +335,7 @@ def gold_shop():
 
             return redirect(url_for('gold_shop', user=current_user))
 
-        return render_template('gold_shop.html', current_user=current_user, gold_buy_rate=buy_rate, gold_sell_rate=sell_rate)
+        return render_template('gold_shop.html', current_user=current_user, gold_buy_rate=buy_rate, gold_sell_rate=sell_rate, total_gold_available=total_gold_available)
     except Exception as e:
         app.logger.error(f"Error handling gold shop: {str(e)}")
         flash('An error occurred while processing your request.', 'danger')
@@ -1324,7 +1325,7 @@ def buy_perk():
             "$set": {"rolls_royce": True}
         }),
         'investinbank': lambda user: db.Users.update_one({"name": current_user}, {
-            "$inc": {"rent_income": investment_amount * 0.1,"investinbankamount":investment_amount},
+            "$inc": {"rent_income": investment_amount * 0.2,"investinbankamount":investment_amount},
             "$set": {"investinbank": True}
         })
     }
